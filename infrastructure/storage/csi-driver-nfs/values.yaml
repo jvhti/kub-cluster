@@ -1,0 +1,20 @@
+
+driver:
+  name: nfs.csi.k8s.io
+  replicas: 1
+
+storageClasses:
+- name: nfs-csi
+  defaultClass: false
+  parameters:
+    server: 10.0.0.5
+    share: /mnt/General/longhorn/
+  mountOptions:
+    - nfsvers=4.1
+
+csiDriver:
+  name: nfs.csi.k8s.io
+  attachRequired: false
+  fsGroupPolicy: File
+
+kubeletDir: /var/lib/kubelet
