@@ -1,0 +1,262 @@
+# kube-prometheus-stack configuration
+# Optimized for a starter K3s cluster with comprehensive monitoring
+
+# Global settings
+global:
+  rbac:
+    create: true
+
+# CRD Configuration
+crds:
+  enabled: true
+
+# Prometheus Configuration
+prometheus:
+  enabled: true
+  service:
+    type: ClusterIP
+  prometheusSpec:
+    # Data retention and storage
+    retention: 7d
+    walCompression: true
+    # Storage configuration with Longhorn
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+    # Resource allocation (starter-friendly & low-end hardware optimized)
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    # Scrape configuration
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    scrapeTimeout: 10s
+    # Enable service discovery for dynamic targets
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+# Alertmanager Configuration
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    strategy:
+      type: Recreate
+    # Storage for alertmanager
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 512Mi
+    # Resource allocation
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    # Retention
+    retention: 72h
+
+# Grafana Configuration
+grafana:
+  enabled: true
+  adminPassword: "admin"
+  defaultDashboardsEnabled: true
+  deploymentStrategy:
+    type: Recreate
+  # Persistence
+  persistence:
+    enabled: true
+    storageClassName: longhorn
+    accessModes:
+      - ReadWriteOnce
+    size: 1Gi
+  service:
+    type: ClusterIP
+  # Resource allocation
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Enable sidecar for dashboard discovery
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+      provider:
+        allowUiUpdates: true
+        disableDelete: false
+        foldersFromFilesStructure: false
+  # Community dashboards - auto-provisioned from grafana.com
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+      - name: 'grafana-dashboards-kubernetes'
+        orgId: 1
+        folder: 'Kubernetes'
+        type: file
+        disableDeletion: true
+        editable: false
+        options:
+          path: /var/lib/grafana/dashboards/kubernetes
+      - name: 'grafana-dashboards-infrastructure'
+        orgId: 1
+        folder: 'Infrastructure'
+        type: file
+        disableDeletion: true
+        editable: false
+        options:
+          path: /var/lib/grafana/dashboards/infrastructure
+  dashboards:
+    kubernetes:
+      k8s-views-global:
+        gnetId: 15757
+        revision: 37
+        datasource: Prometheus
+      k8s-views-namespaces:
+        gnetId: 15758
+        revision: 34
+        datasource: Prometheus
+      k8s-views-nodes:
+        gnetId: 15759
+        revision: 29
+        datasource: Prometheus
+      k8s-views-pods:
+        gnetId: 15760
+        revision: 28
+        datasource: Prometheus
+      node-exporter-full:
+        gnetId: 1860
+        revision: 36
+        datasource: Prometheus
+    infrastructure:
+      argocd:
+        gnetId: 14584
+        revision: 1
+        datasource: Prometheus
+      longhorn:
+        gnetId: 13032
+        revision: 6
+        datasource: Prometheus
+  # Additional data sources configuration
+  additionalDataSources:
+    - name: Prometheus
+      type: prometheus
+      url: http://prometheus-operated.kube-prometheus-stack.svc:9090
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki.loki.svc:3100
+      jsonData:
+        timeout: 60
+        maxLines: 1000
+    - name: Tempo
+      type: tempo
+      access: proxy
+      url: http://tempo.tempo.svc:3100
+  # Grafana configuration
+  grafana.ini:
+    server:
+      root_url: https://grafana.vanillax.xyz
+    security:
+      allow_embedding: true
+      cookie_secure: true
+      strict_transport_security: true
+    analytics:
+      reporting_enabled: false
+      check_for_updates: false
+    snapshots:
+      external_enabled: false
+    explore:
+      enabled: true
+
+# Node Exporter Configuration
+nodeExporter:
+  enabled: true
+  hostRootFsMount:
+    enabled: true
+    mountPropagation: HostToContainer
+  # k3s-specific: disable problematic nfsd collector
+  extraArgs:
+    - --no-collector.nfsd
+    - --web.timeout=30s
+    - --log.level=warn
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# kube-state-metrics Configuration
+kubeStateMetrics:
+  enabled: true
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# Prometheus Operator Configuration
+prometheusOperator:
+  enabled: true
+  admissionWebhooks:
+    enabled: false
+  tls:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# Additional monitoring components
+kubelet:
+  enabled: true
+  serviceMonitor:
+    interval: 30s
+kubeApiServer:
+  enabled: true
+  serviceMonitor:
+    interval: 30s
+coreDns:
+  enabled: true
+  serviceMonitor:
+    interval: 30s
+
+# Disabled - not available in K3s or replaced by Cilium
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
