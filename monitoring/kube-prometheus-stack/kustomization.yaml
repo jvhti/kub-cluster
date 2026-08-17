@@ -14,9 +14,12 @@ resources:
   - network-policy.yaml
   - dashboards/k3s-cluster-overview-configmap.yaml
   - dashboards/dashboard-16450-configmap.yaml
-
-# Strategic merge patches to handle resource conflicts
-patchesStrategicMerge:
+  # alertmanager-config.yaml is a standalone Secret (full apiVersion/kind),
+  # not a patch onto a pre-existing resource — the Helm chart doesn't
+  # render a Secret under this exact name, so it belongs under `resources`
+  # (create) rather than `patchesStrategicMerge` (merge into an existing
+  # Id), which was failing the build with
+  # "failed to find unique target for patch".
   - alertmanager-config.yaml
 
 helmCharts:
