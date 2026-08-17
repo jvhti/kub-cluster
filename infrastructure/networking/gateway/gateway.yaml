@@ -5,6 +5,22 @@ metadata:
   namespace: gateway
   annotations:
     argocd.argoproj.io/sync-wave: "7" # After the wildcard Certificate is issued
+    # external-dns only reads the target annotation from the Gateway itself
+    # (not from HTTPRoutes) when using the gateway-httproute source, so this
+    # is the one place to override the DNS target away from the Gateway's
+    # internal address (10.2.0.1) to the public/WAN IP. Static IP per user
+    # confirmation — update if the ISP-assigned IP ever changes.
+    #
+    # The real value is injected at build time by kustomization.yaml's
+    # `replacements`, sourced from the public-ip-config ConfigMap (itself
+    # generated from the git-ignored public-ip.env — see .gitignore and
+    # public-ip.env.example) so the actual IP is never committed to git.
+    # (Not a Secret: this Kustomize version's secretGenerator only emits
+    # base64 data, which `replacements` can't decode — and the value is
+    # published in public DNS the moment this feature works anyway, so a
+    # ConfigMap achieves the actual goal, keeping it out of git, just as
+    # well as a Secret would have.)
+    external-dns.alpha.kubernetes.io/target: "REPLACED_BY_KUSTOMIZE"
 spec:
   gatewayClassName: cilium
   addresses:
