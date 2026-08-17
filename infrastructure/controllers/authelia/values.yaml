@@ -62,8 +62,7 @@ configMap:
     # auth.jvos.dev sets.
     cookies:
       - domain: 'jvos.dev'
-        subdomain: 'auth'
-        authelia_url: 'https://auth.jvos.dev'
+        subdomain: 'auth' # combines with domain to build https://auth.jvos.dev — no separate authelia_url field exists (confirmed after a real "additional properties 'authelia_url' not allowed" build error).
         default_redirection_url: 'https://longhorn.jvos.dev'
 
   # No SMTP server exists in this cluster; filesystem notifier (writes
