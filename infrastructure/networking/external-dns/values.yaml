@@ -18,7 +18,7 @@ txtOwnerId: kub-cluster
 
 policy: sync
 
-# Cloudflare proxy (orange cloud) off: we're pointing records at a LAN IP for
-# now via router port-forward, not something Cloudflare should proxy/anycast.
-extraArgs:
-  - --cloudflare-proxied=false
+# Cloudflare proxy (orange cloud) is off by default — --cloudflare-proxied is a
+# presence-only flag that turns it ON, so omitting it (rather than passing
+# =false, which external-dns doesn't accept) keeps records as plain DNS-only,
+# which is what we want while pointing at a LAN IP via router port-forward.
