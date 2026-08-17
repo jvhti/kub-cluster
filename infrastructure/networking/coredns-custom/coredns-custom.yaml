@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  # k3s's CoreDNS Corefile has `import /etc/coredns/custom/*.server` at the
+  # top level (outside the main '.:53' server block) — this .server file
+  # defines a separate, zone-scoped server block for jvos.dev.
+  #
+  # Why: pods resolving *.jvos.dev via public DNS get the public/WAN IP
+  # (177.223.44.79), but connecting back to that IP from inside the cluster
+  # times out (hairpin NAT isn't supported on the router) — confirmed via a
+  # real oauth2-proxy pod hanging on OIDC discovery against
+  # https://auth.jvos.dev. This split-horizon override makes in-cluster
+  # clients resolve *.jvos.dev straight to the internal Gateway VIP
+  # (192.168.1.240, same as infrastructure/networking/gateway/gateway.yaml's
+  # pinned address) instead, skipping the round-trip through the public IP
+  # entirely. External clients are unaffected — they never talk to this
+  # cluster's CoreDNS.
+  #
+  # A separate server block (not a `hosts` addition to the main '.:53'
+  # block via *.override) is required here because CoreDNS's `hosts` plugin
+  # can only be used once per server block, and the main block already has
+  # one (for /etc/coredns/NodeHosts).
+  jvos.dev.server: |
+    jvos.dev:53 {
+        hosts {
+            192.168.1.240 jvos.dev
+            192.168.1.240 auth.jvos.dev
+            192.168.1.240 argocd.jvos.dev
+            192.168.1.240 longhorn.jvos.dev
+            fallthrough
+        }
+        forward . /etc/resolv.conf
+    }

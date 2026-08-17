@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - coredns-custom.yaml
+
+commonAnnotations:
+  # Well before authelia (-3) / oauth2-proxy (-2) — both need auth.jvos.dev
+  # to resolve to the internal Gateway VIP from the moment they start.
+  argocd.argoproj.io/sync-wave: "-20"
