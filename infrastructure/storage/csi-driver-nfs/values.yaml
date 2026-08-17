@@ -3,12 +3,14 @@ driver:
   name: nfs.csi.k8s.io
   replicas: 1
 
-storageClasses:
-- name: nfs-csi
-  defaultClass: false
+storageClass:
+  create: true
+  name: nfs-csi
   parameters:
     server: 10.0.0.5
     share: /mnt/General/longhorn/
+  reclaimPolicy: Delete
+  volumeBindingMode: Immediate
   mountOptions:
     - nfsvers=4.1
 
