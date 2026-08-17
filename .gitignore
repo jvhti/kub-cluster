@@ -1,0 +1,3 @@
+# Real-world secret/environment-specific values that shouldn't be committed.
+# Each is checked in as a *.env.example alongside it showing the expected shape.
+infrastructure/networking/gateway/public-ip.env
