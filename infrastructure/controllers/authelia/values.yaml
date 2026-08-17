@@ -12,10 +12,20 @@ pod:
     - name: users-database
       secret:
         secretName: authelia-users
+    - name: oidc-issuer-key
+      secret:
+        secretName: authelia-crypto
+        items:
+          - key: oidc-issuer-private-key
+            path: oidc-issuer-private-key.pem
   extraVolumeMounts:
     - name: users-database
       mountPath: /config/users_database.yml
       subPath: users_database.yml
+      readOnly: true
+    - name: oidc-issuer-key
+      mountPath: /secrets/oidc-issuer-private-key.pem
+      subPath: oidc-issuer-private-key.pem
       readOnly: true
 
 configMap:
@@ -50,13 +60,19 @@ configMap:
       hmac_secret:
         secret_name: authelia-crypto
         path: oidc-hmac-secret
+      # jwks[].key uses a different shape than the other secret_name/path
+      # fields here (confirmed directly from the chart's own values.yaml
+      # comments: {value: <inline PEM>, path: <absolute file path>}), and
+      # this validation-check template doesn't include it among the fields
+      # checked against secret.additionalSecrets — so it's mounted directly
+      # via pod.extraVolumes/extraVolumeMounts above instead, at the
+      # absolute path referenced here.
       jwks:
         - key_id: 'main'
           algorithm: 'RS256'
           use: 'sig'
           key:
-            secret_name: authelia-crypto
-            path: oidc-issuer-private-key
+            path: '/secrets/oidc-issuer-private-key.pem'
       clients:
         - client_id: 'oauth2-proxy'
           client_name: 'oauth2-proxy (Longhorn)'
@@ -85,3 +101,28 @@ ingress:
     parentRefs:
       - name: gateway-internal
         namespace: gateway
+
+# Every secret_name referenced above (configMap.session.encryption_key,
+# configMap.storage.encryption_key, configMap.identity_providers.oidc.hmac_secret,
+# and the client_secret's authelia-oidc-client) must be registered here, or
+# the chart's own validation template fails the build. Each entry's
+# items[].path must match the `path:` value used at the point of reference
+# above, since the resolved file location is
+# '{secret.mountPath}/{secret_name}/{path}' (mountPath defaults to
+# '/secrets') — confirmed directly from the chart's values.yaml comments.
+secret:
+  additionalSecrets:
+    authelia-crypto:
+      items:
+        - key: session-encryption-key
+          path: session-encryption-key
+        - key: storage-encryption-key
+          path: storage-encryption-key
+        - key: oidc-hmac-secret
+          path: oidc-hmac-secret
+        # oidc-issuer-private-key is intentionally NOT here — it's mounted
+        # separately via pod.extraVolumes above (see the jwks comment).
+    authelia-oidc-client:
+      items:
+        - key: client-secret-hash
+          path: client-secret-hash
