@@ -8,7 +8,7 @@ resources:
 helmCharts:
   - name: oauth2-proxy
     repo: https://oauth2-proxy.github.io/manifests
-    version: 4.35.10 # renovate: github-releases=oauth2-proxy/manifests
+    version: 10.7.0 # renovate: github-releases=oauth2-proxy/manifests
     releaseName: oauth2-proxy
     namespace: oauth2-proxy
     valuesFile: values.yaml
