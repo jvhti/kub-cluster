@@ -24,7 +24,7 @@ spec:
   gatewayClassName: cilium
   addresses:
     - type: IPAddress
-      value: 10.2.0.1 # Pinned so the router port-forward doesn't need to change if the Service is recreated. Must stay inside main-pool's CIDR (infrastructure/networking/cilium/ip-pool.yaml).
+      value: 192.168.1.240 # Pinned so the router port-forward/DMZ target doesn't need to change if the Service is recreated. Must be inside gateway-lan-pool's range (ip-pool.yaml in this dir) — deliberately on the LAN subnet (192.168.1.0/24) rather than main-pool's 10.2.0.0/16, since L2 announcement/ARP for an off-subnet VIP never reaches the router.
   listeners:
     - name: http
       port: 80
