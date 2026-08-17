@@ -1,0 +1,15 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: jvos-dev-wildcard
+  namespace: gateway
+  annotations:
+    argocd.argoproj.io/sync-wave: "6" # After cloudflare-cluster-issuer (wave 5)
+spec:
+  secretName: jvos-dev-wildcard-tls
+  issuerRef:
+    name: cloudflare-cluster-issuer
+    kind: ClusterIssuer
+  dnsNames:
+    - "jvos.dev"
+    - "*.jvos.dev"

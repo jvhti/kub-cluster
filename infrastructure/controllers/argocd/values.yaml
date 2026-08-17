@@ -45,6 +45,11 @@ redis:
       memory: 128Mi
 
 server:
+  service:
+    # Traffic now flows through the shared gateway-internal Gateway
+    # (infrastructure/networking/gateway/) via http-route.yaml instead of a
+    # standalone LoadBalancer Service.
+    type: ClusterIP
   resources:
     requests:
       cpu: 50m

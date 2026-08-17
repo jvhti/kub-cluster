@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  # cloudflare-api-token Secret is mirrored into this namespace by the
+  # reflector controller from cert-manager's Secret — see
+  # infrastructure/controllers/cert-manager/cloudflare-secret.yaml and
+  # infrastructure/networking/reflector/.
+
+helmCharts:
+  - name: external-dns
+    repo: https://kubernetes-sigs.github.io/external-dns/
+    version: 1.21.1 # renovate: github-releases=kubernetes-sigs/external-dns
+    releaseName: external-dns
+    namespace: external-dns
+    valuesFile: values.yaml
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "-5"

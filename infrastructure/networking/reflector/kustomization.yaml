@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+
+helmCharts:
+  - name: reflector
+    repo: https://emberstack.github.io/helm-charts
+    version: 10.0.65 # renovate: github-releases=emberstack/kubernetes-reflector
+    releaseName: reflector
+    namespace: reflector
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "-15" # Before cert-manager (-10), so reflector is watching before the cloudflare-api-token Secret it needs to mirror is created

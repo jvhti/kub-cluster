@@ -8,7 +8,7 @@ spec:
     - name: gateway-internal
       namespace: gateway
   hostnames:
-    - "argocd.jvhti.dev"
+    - "argocd.jvos.dev"
   rules:
     - matches:
         - path:

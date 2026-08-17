@@ -5,17 +5,17 @@ metadata:
   namespace: longhorn-system
 spec:
   parentRefs:
-    - name: gateway-internal # Assuming you have an internal gateway, adjust if needed
-      namespace: gateway # Assuming your gateway is in the 'gateway' namespace
+    - name: gateway-internal
+      namespace: gateway
   hostnames:
-    - "longhorn.jvos.dev" # You can change this hostname
+    - "longhorn.jvos.dev"
   rules:
     - matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: longhorn-frontend # Default Longhorn UI service name
+        - name: longhorn-frontend
           namespace: longhorn-system
-          port: 80 # Default Longhorn UI port
+          port: 80
           weight: 1

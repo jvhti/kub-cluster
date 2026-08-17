@@ -1,0 +1,24 @@
+provider:
+  name: cloudflare
+
+env:
+  - name: CF_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare-api-token
+        key: api-token
+
+sources:
+  - gateway-httproute
+
+domainFilters:
+  - jvos.dev
+
+txtOwnerId: kub-cluster
+
+policy: sync
+
+# Cloudflare proxy (orange cloud) off: we're pointing records at a LAN IP for
+# now via router port-forward, not something Cloudflare should proxy/anycast.
+extraArgs:
+  - --cloudflare-proxied=false

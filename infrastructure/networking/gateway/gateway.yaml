@@ -1,0 +1,29 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gateway-internal
+  namespace: gateway
+  annotations:
+    argocd.argoproj.io/sync-wave: "7" # After the wildcard Certificate is issued
+spec:
+  gatewayClassName: cilium
+  addresses:
+    - type: IPAddress
+      value: 10.2.0.1 # Pinned so the router port-forward doesn't need to change if the Service is recreated. Must stay inside main-pool's CIDR (infrastructure/networking/cilium/ip-pool.yaml).
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: jvos-dev-wildcard-tls
+      allowedRoutes:
+        namespaces:
+          from: All
