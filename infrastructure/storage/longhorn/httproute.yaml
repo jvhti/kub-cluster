@@ -15,7 +15,12 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: longhorn-frontend
-          namespace: longhorn-system
+        # Routes through oauth2-proxy (backed by Authelia) instead of
+        # straight to longhorn-frontend — Longhorn's UI has no built-in
+        # auth and was fully internet-exposed once this Gateway/DNS/DMZ
+        # setup went live. See infrastructure/controllers/authelia/ and
+        # infrastructure/controllers/oauth2-proxy/.
+        - name: oauth2-proxy
+          namespace: oauth2-proxy
           port: 80
           weight: 1
