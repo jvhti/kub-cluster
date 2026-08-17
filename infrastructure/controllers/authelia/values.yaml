@@ -18,6 +18,12 @@ pod:
         items:
           - key: oidc-issuer-private-key
             path: oidc-issuer-private-key.pem
+    - name: oidc-client-secret
+      secret:
+        secretName: authelia-oidc-client
+        items:
+          - key: client-secret-hash
+            path: client-secret-hash.txt
   extraVolumeMounts:
     - name: users-database
       mountPath: /config/users_database.yml
@@ -26,6 +32,10 @@ pod:
     - name: oidc-issuer-key
       mountPath: /secrets/oidc-issuer-private-key.pem
       subPath: oidc-issuer-private-key.pem
+      readOnly: true
+    - name: oidc-client-secret
+      mountPath: /secrets/client-secret-hash.txt
+      subPath: client-secret-hash.txt
       readOnly: true
 
 configMap:
@@ -45,6 +55,31 @@ configMap:
     encryption_key:
       secret_name: authelia-crypto
       path: session-encryption-key
+    # 'cookies' is required (chart default is an empty list). domain must
+    # be the parent jvos.dev (not auth.jvos.dev) so the session cookie is
+    # shared across subdomains — oauth2-proxy in front of
+    # longhorn.jvos.dev needs to see the same cookie the login on
+    # auth.jvos.dev sets.
+    cookies:
+      - domain: 'jvos.dev'
+        subdomain: 'auth'
+        authelia_url: 'https://auth.jvos.dev'
+        default_redirection_url: 'https://longhorn.jvos.dev'
+
+  # No SMTP server exists in this cluster; filesystem notifier (writes
+  # notifications, e.g. password-reset links, to a local file inside the
+  # pod) is the simplest working option for a single-admin setup with no
+  # self-registration/password-reset flow actually exposed anyway.
+  notifier:
+    filesystem:
+      enabled: true
+      filename: '/config/notification.txt'
+
+  # Chart default is 'deny'; must be a real policy since no per-resource
+  # access_control.rules are defined — matches the client's own
+  # authorization_policy: one_factor.
+  access_control:
+    default_policy: 'one_factor'
 
   storage:
     encryption_key:
@@ -76,9 +111,14 @@ configMap:
       clients:
         - client_id: 'oauth2-proxy'
           client_name: 'oauth2-proxy (Longhorn)'
+          # client_secret uses the same {value/path} shape as jwks[].key
+          # (absolute file path), not the {secret_name/path} indirection —
+          # confirmed directly from the chart's own values.yaml comments
+          # after the {secret_name/path} form failed at runtime with
+          # "open client-secret-hash: no such file or directory". Mounted
+          # via pod.extraVolumes above, same pattern as the jwks key.
           client_secret:
-            secret_name: authelia-oidc-client
-            path: client-secret-hash
+            path: '/secrets/client-secret-hash.txt'
           public: false
           authorization_policy: 'one_factor'
           redirect_uris:
@@ -103,13 +143,16 @@ ingress:
         namespace: gateway
 
 # Every secret_name referenced above (configMap.session.encryption_key,
-# configMap.storage.encryption_key, configMap.identity_providers.oidc.hmac_secret,
-# and the client_secret's authelia-oidc-client) must be registered here, or
-# the chart's own validation template fails the build. Each entry's
-# items[].path must match the `path:` value used at the point of reference
-# above, since the resolved file location is
+# configMap.storage.encryption_key, configMap.identity_providers.oidc.hmac_secret)
+# must be registered here, or the chart's own validation template fails the
+# build. Each entry's items[].path must match the `path:` value used at the
+# point of reference above, since the resolved file location is
 # '{secret.mountPath}/{secret_name}/{path}' (mountPath defaults to
 # '/secrets') — confirmed directly from the chart's values.yaml comments.
+#
+# authelia-oidc-client is NOT here: client_secret uses the {value/path}
+# absolute-file-path shape (like jwks[].key), not this secret_name/path
+# indirection — see the client_secret comment above.
 secret:
   additionalSecrets:
     authelia-crypto:
@@ -122,7 +165,3 @@ secret:
           path: oidc-hmac-secret
         # oidc-issuer-private-key is intentionally NOT here — it's mounted
         # separately via pod.extraVolumes above (see the jwks comment).
-    authelia-oidc-client:
-      items:
-        - key: client-secret-hash
-          path: client-secret-hash
