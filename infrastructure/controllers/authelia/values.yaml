@@ -133,6 +133,11 @@ configMap:
             - 'code'
 
 ingress:
+  # Top-level master switch, separate from gatewayAPI.enabled below — chart
+  # defaults BOTH to false, and without this one no ingress-related
+  # resource (including the HTTPRoute) is generated at all (confirmed:
+  # gatewayAPI.enabled: true alone produced zero HTTPRoute).
+  enabled: true
   gatewayAPI:
     enabled: true
     hostnamesOverride:
