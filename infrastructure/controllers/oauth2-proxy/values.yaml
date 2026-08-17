@@ -1,0 +1,33 @@
+# See infrastructure/controllers/oauth2-proxy/secrets.yaml for how
+# config.existingSecret's keys (client-id/client-secret/cookie-secret) get
+# their real values. client-secret's plaintext must match the hash stored in
+# infrastructure/controllers/authelia/secrets.yaml's authelia-oidc-client
+# Secret — same underlying credential, two forms (Authelia validates
+# against a hash, oauth2-proxy needs the plaintext).
+
+config:
+  existingSecret: oauth2-proxy-credentials
+
+extraArgs:
+  provider: oidc
+  oidc-issuer-url: https://auth.jvos.dev
+  redirect-url: https://longhorn.jvos.dev/oauth2/callback
+  email-domain: "*" # No group/domain restriction beyond Authelia's own single-user login gating who can authenticate at all.
+  cookie-domain: .jvos.dev # Matches Authelia's session cookie domain (infrastructure/controllers/authelia/values.yaml's configMap.session.cookies) so the two share scope correctly.
+  whitelist-domain: .jvos.dev
+  reverse-proxy: "true" # Sits behind Cilium's Envoy Gateway — needed so X-Forwarded-* headers are honored correctly.
+  set-xauthrequest: "true"
+
+# Modern (non-deprecated) way to configure the upstream this proxy forwards
+# authenticated requests to — the legacy top-level `--upstream` flag/
+# config.configFile 'upstreams' option is deprecated per the chart's own
+# values.yaml comments ("failed to load core options: '' has invalid keys:
+# upstreams").
+alphaConfig:
+  enabled: true
+  configData:
+    upstreamConfig:
+      upstreams:
+        - id: longhorn
+          path: /
+          uri: http://longhorn-frontend.longhorn-system.svc.cluster.local:80
