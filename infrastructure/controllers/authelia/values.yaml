@@ -8,6 +8,17 @@
 # 'storage' not allowed" at the root).
 
 pod:
+  # Chart defaults to DaemonSet (one pod per node). Combined with
+  # configMap.storage.local (SQLite, local to each pod) that meant 3
+  # independent pods with independent databases and no shared session
+  # state, sitting behind a load-balanced Gateway — any multi-request flow
+  # (like the OIDC authorization code exchange) that landed on two
+  # different pods failed. Confirmed via a real login attempt: "error
+  # selecting oauth2 consent session ...: sql: no rows in result set".
+  # Single-replica Deployment fixes it — one pod, one DB, no cross-pod
+  # session issues (acceptable for a single-admin home-lab setup).
+  kind: 'Deployment'
+  replicas: 1
   extraVolumes:
     - name: users-database
       secret:
