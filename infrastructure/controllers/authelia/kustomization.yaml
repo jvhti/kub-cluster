@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  # - secrets.yaml  # Real values created imperatively — see that file's comments.
+
+helmCharts:
+  - name: authelia
+    repo: https://charts.authelia.com
+    version: 0.11.6 # renovate: github-releases=authelia/chartrepo
+    releaseName: authelia
+    namespace: authelia
+    valuesFile: values.yaml
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "-3" # Before oauth2-proxy and Longhorn's HTTPRoute change, which depend on Authelia being up.

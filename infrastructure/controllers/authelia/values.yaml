@@ -1,0 +1,80 @@
+# See infrastructure/controllers/authelia/secrets.yaml for how the
+# referenced Secret names/keys below get their real values.
+
+pod:
+  extraVolumes:
+    - name: users-database
+      secret:
+        secretName: authelia-users
+  extraVolumeMounts:
+    - name: users-database
+      mountPath: /config/users_database.yml
+      subPath: users_database.yml
+      readOnly: true
+
+authentication_backend:
+  file:
+    enabled: true
+    path: '/config/users_database.yml'
+    password:
+      algorithm: 'argon2'
+
+session:
+  name: 'authelia_session'
+  same_site: 'lax'
+  expiration: '1 hour'
+  inactivity: '5 minutes'
+  remember_me: '1 month'
+  encryption_key:
+    secret_name: authelia-crypto
+    path: session-encryption-key
+
+storage:
+  encryption_key:
+    secret_name: authelia-crypto
+    path: storage-encryption-key
+  local:
+    enabled: true
+    path: '/config/db.sqlite3'
+
+identity_providers:
+  oidc:
+    enabled: true
+    hmac_secret:
+      secret_name: authelia-crypto
+      path: oidc-hmac-secret
+    jwks:
+      - key_id: 'main'
+        algorithm: 'RS256'
+        use: 'sig'
+        key:
+          secret_name: authelia-crypto
+          path: oidc-issuer-private-key
+    clients:
+      - client_id: 'oauth2-proxy'
+        client_name: 'oauth2-proxy (Longhorn)'
+        client_secret:
+          secret_name: authelia-oidc-client
+          path: client-secret-hash
+        public: false
+        authorization_policy: 'one_factor'
+        redirect_uris:
+          - 'https://longhorn.jvos.dev/oauth2/callback'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+          - 'groups'
+        grant_types:
+          - 'authorization_code'
+        response_types:
+          - 'code'
+
+ingress:
+  gatewayAPI:
+    enabled: true
+    hostnamesOverride:
+      - 'auth.jvos.dev'
+    parentRefs:
+      - name: gateway-internal
+        namespace: gateway
