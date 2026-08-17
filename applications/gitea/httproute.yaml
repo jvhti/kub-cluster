@@ -1,0 +1,21 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: gitea
+  namespace: gitea
+spec:
+  parentRefs:
+    - name: gateway-internal
+      namespace: gateway
+  hostnames:
+    - "gitea.jvos.dev"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: gitea-http
+          namespace: gitea
+          port: 3000
+          weight: 1

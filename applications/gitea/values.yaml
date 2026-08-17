@@ -1,0 +1,10 @@
+# Chart defaults, with storage moved off Longhorn (NVMe, low capacity) onto
+# the TrueNAS NFS share (bulk HDD) via csi-driver-nfs's nfs-csi StorageClass.
+# Bundled postgresql-ha / valkey-cluster subcharts stay on the longhorn
+# (NVMe) default StorageClass - databases need low-latency random I/O that
+# NFS can't provide.
+persistence:
+  storageClass: nfs-csi
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
