@@ -8,6 +8,16 @@
 config:
   existingSecret: oauth2-proxy-credentials
 
+# NOTE: alphaConfig was tried first, but alphaConfig.enabled: true switches
+# oauth2-proxy into a mode where most legacy CLI flags (including
+# --oidc-issuer-url, --provider, etc.) are rejected outright — confirmed via
+# a real runtime error: "unknown flag: --oidc-issuer-url" once --alpha-config
+# appeared in the rendered container args alongside the legacy extraArgs
+# below. --upstream is still fully supported (not removed, despite being
+# superseded by alpha config's upstreamConfig) — using it keeps everything
+# on the well-documented legacy CLI-flag path instead of the alpha-config
+# schema, which is comparatively under-documented and easy to get subtly
+# wrong.
 extraArgs:
   provider: oidc
   oidc-issuer-url: https://auth.jvos.dev
@@ -17,17 +27,4 @@ extraArgs:
   whitelist-domain: .jvos.dev
   reverse-proxy: "true" # Sits behind Cilium's Envoy Gateway — needed so X-Forwarded-* headers are honored correctly.
   set-xauthrequest: "true"
-
-# Modern (non-deprecated) way to configure the upstream this proxy forwards
-# authenticated requests to — the legacy top-level `--upstream` flag/
-# config.configFile 'upstreams' option is deprecated per the chart's own
-# values.yaml comments ("failed to load core options: '' has invalid keys:
-# upstreams").
-alphaConfig:
-  enabled: true
-  configData:
-    upstreamConfig:
-      upstreams:
-        - id: longhorn
-          path: /
-          uri: http://longhorn-frontend.longhorn-system.svc.cluster.local:80
+  upstream: http://longhorn-frontend.longhorn-system.svc.cluster.local:80
