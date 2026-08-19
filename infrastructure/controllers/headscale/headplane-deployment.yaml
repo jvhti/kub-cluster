@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: headplane
-          image: ghcr.io/tale/headplane:v0.7.0 # renovate: github-releases=tale/headplane
+          image: ghcr.io/tale/headplane:0.7.0 # renovate: github-releases=tale/headplane (note: image tags on ghcr.io drop the "v" prefix GitHub release tags use)
           ports:
             - name: http
               containerPort: 3000
@@ -38,15 +38,17 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
+          # /bin/hp_healthcheck is the image's own dedicated healthcheck
+          # binary (used by its built-in Docker HEALTHCHECK) - used here
+          # instead of an httpGet probe since the UI's actual root path is
+          # /admin, not /, and a plain GET / may not reliably indicate health.
           readinessProbe:
-            httpGet:
-              path: /
-              port: http
+            exec:
+              command: ["/bin/hp_healthcheck"]
             initialDelaySeconds: 5
           livenessProbe:
-            httpGet:
-              path: /
-              port: http
+            exec:
+              command: ["/bin/hp_healthcheck"]
             initialDelaySeconds: 10
       volumes:
         - name: config
