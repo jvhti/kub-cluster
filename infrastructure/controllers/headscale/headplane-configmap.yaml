@@ -14,12 +14,15 @@ data:
       data_path: /var/lib/headplane
 
     headscale:
-      # In-cluster Service DNS, straight to Headscale's own HTTPS listener -
-      # bypasses gateway-internal's TLS passthrough entirely (no need to
-      # route API calls through it, this is pod-to-pod). See
-      # infrastructure/controllers/headscale/ for why Headscale terminates
-      # its own TLS on 8443.
-      url: "https://headscale.headscale.svc.cluster.local:8443"
+      # Public hostname, not the in-cluster Service DNS name - Headscale's
+      # cert (certificate.yaml) is issued for headscale.jvos.dev only, so TLS
+      # hostname verification fails against headscale.headscale.svc.cluster.
+      # local even though that's reachable pod-to-pod (confirmed live:
+      # "Headscale unreachable at boot" using the Service DNS name). Traffic
+      # still stays inside the cluster/LAN via coredns-custom's split-horizon
+      # override (infrastructure/networking/coredns-custom/) rather than
+      # round-tripping out to the public IP.
+      url: "https://headscale.jvos.dev"
       public_url: "https://headscale.jvos.dev"
       config_path: /etc/headscale/config.yaml
       api_key_path: /etc/headplane/secrets/headscale-api-key
@@ -30,6 +33,12 @@ data:
       docker:
         enabled: false
       kubernetes:
-        enabled: false # Sidecar/reload-signaling mode - not used, Headplane runs as its own separate Deployment talking to Headscale purely over its HTTP API
+        enabled: false
+        # Required by Headplane's config schema even when disabled (confirmed
+        # live: "integration.kubernetes.pod_name must be a string (was
+        # missing)" otherwise). Meaningless here since kubernetes.enabled is
+        # false - Headplane runs as its own separate Deployment rather than a
+        # sidecar in Headscale's pod, talking to it purely over the HTTP API.
+        pod_name: "headplane"
       proc:
         enabled: false
