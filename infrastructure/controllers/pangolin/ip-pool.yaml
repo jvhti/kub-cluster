@@ -1,0 +1,25 @@
+apiVersion: cilium.io/v2alpha1
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: pangolin-gerbil-pool
+spec:
+  # Gerbil (WireGuard) needs its own LoadBalancer IP, separate from
+  # gateway-lan-pool (infrastructure/networking/gateway/ip-pool.yaml) which is
+  # serviceSelector-scoped strictly to the HTTP(S) Gateway's Service. Draws
+  # from the same pre-vetted free LAN range that pool documents
+  # (192.168.1.240-250, .240 already taken by the Gateway) so it's L2
+  # reachable via main-l2-policy (infrastructure/networking/cilium/l2-policy.yaml),
+  # which is cluster-wide/unscoped and already covers any new LoadBalancer Service.
+  #
+  # Requires a NEW router port-forward for UDP 51820 (and 21820 if
+  # clients_start_port traffic needs to traverse NAT too) to this IP - separate
+  # from the existing 80/443 -> 192.168.1.240 DMZ rule. See
+  # infrastructure/networking/gateway/gateway.yaml's comments for the existing
+  # equivalent setup.
+  blocks:
+    - start: "192.168.1.241"
+      stop: "192.168.1.241"
+  serviceSelector:
+    matchLabels:
+      "io.kubernetes.service.namespace": "pangolin"
+      "io.kubernetes.service.name": "pangolin-gerbil"

@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: pangolin-tls
+  namespace: pangolin
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1" # Before traefik/pangolin need the Secret
+spec:
+  secretName: pangolin-tls
+  issuerRef:
+    name: cloudflare-cluster-issuer
+    kind: ClusterIssuer
+  dnsNames:
+    - "pangolin.jvos.dev"

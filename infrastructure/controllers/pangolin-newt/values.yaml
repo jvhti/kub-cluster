@@ -1,0 +1,13 @@
+# Site agent for the Pangolin server deployed in infrastructure/controllers/pangolin/
+# - registers this cluster's Services as Pangolin "Resources" so remote
+# devices (via Pangolin CLI/Olm/mobile app) can reach them through the tunnel.
+# Without this, Pangolin has nothing to proxy to.
+newtInstances:
+  # Helm merges list values by full replacement, not by key - every field this
+  # instance needs must be set explicitly here rather than relying on the
+  # chart's own default newtInstances[0] entry (which this list replaces
+  # wholesale, including its `enabled: true`).
+  - name: main-tunnel
+    enabled: true
+    auth:
+      existingSecretName: pangolin-newt-credentials # see secrets.yaml

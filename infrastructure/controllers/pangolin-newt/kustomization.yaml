@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: pangolin
+
+resources:
+  - secrets.yaml
+
+helmCharts:
+  - name: newt
+    repo: oci://ghcr.io/fosrl/helm-charts
+    version: 1.5.0 # renovate: github-tags=fosrl/helm-charts
+    releaseName: pangolin-newt
+    namespace: pangolin
+    valuesFile: values.yaml
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "10" # After pangolin/ (5) - needs the Pangolin server up first, and a site created via its dashboard to get NEWT_ID/NEWT_SECRET
