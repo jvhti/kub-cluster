@@ -1,4 +1,0 @@
-# Chart defaults - single operator Deployment, cluster-scoped CRDs. Backs
-# Pangolin's database (infrastructure/controllers/pangolin/db-cluster.yaml)
-# via a CNPG Cluster CR - no per-app Postgres subchart needed the way gitea
-# bundles its own postgresql-ha.
