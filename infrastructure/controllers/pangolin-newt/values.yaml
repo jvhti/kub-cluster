@@ -2,6 +2,16 @@
 # - registers this cluster's Services as Pangolin "Resources" so remote
 # devices (via Pangolin CLI/Olm/mobile app) can reach them through the tunnel.
 # Without this, Pangolin has nothing to proxy to.
+#
+# NOTE: templates/deployment.yaml in this chart (newt-1.5.0) never sets
+# metadata.namespace, unlike every other resource it renders - confirmed by
+# rendering in isolation, including with global.namespaceOverride set (no
+# effect - the template just doesn't reference it). kustomize's own
+# `namespace:` transformer (kustomization.yaml) doesn't backfill it either,
+# so it silently fell back to ArgoCD's Application destination default
+# (pangolin-newt, from the ApplicationSet's '{{path.basename}}' templating)
+# instead of landing in pangolin like everything else. Fixed via an explicit
+# `patches:` entry in kustomization.yaml targeting this Deployment by name.
 newtInstances:
   # Helm merges list values by full replacement, not by key - every field this
   # instance needs must be set explicitly here rather than relying on the
