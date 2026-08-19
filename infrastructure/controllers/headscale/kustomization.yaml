@@ -11,6 +11,19 @@ resources:
   - deployment.yaml
   - service.yaml
   - tlsroute.yaml
+  # Headplane: web admin UI for Headscale (headscale.jvos.dev has no web UI
+  # of its own, only API/control endpoints). Deployed into this same
+  # namespace/Application - rather than its own ApplicationSet-discovered
+  # directory - specifically so it can mount headscale-config (configmap.yaml
+  # above) read-only for its optional "show current Headscale config" panel;
+  # ConfigMap mounts can't cross namespaces, and this repo's Applications are
+  # one-namespace-per-directory.
+  - headplane-secrets.yaml
+  - headplane-configmap.yaml
+  - headplane-pvc.yaml
+  - headplane-deployment.yaml
+  - headplane-service.yaml
+  - headplane-httproute.yaml
 
 # TLSRoute (passthrough), not HTTPRoute (terminate) like every other app on
 # gateway-internal. Reason: Tailscale client registration upgrades the HTTP

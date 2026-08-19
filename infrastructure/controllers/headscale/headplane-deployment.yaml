@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: headplane
+  namespace: headscale
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: headplane
+  template:
+    metadata:
+      labels:
+        app: headplane
+    spec:
+      containers:
+        - name: headplane
+          image: ghcr.io/tale/headplane:v0.7.0 # renovate: github-releases=tale/headplane
+          ports:
+            - name: http
+              containerPort: 3000
+          volumeMounts:
+            - name: config
+              mountPath: /etc/headplane
+              readOnly: true
+            - name: headscale-config
+              mountPath: /etc/headscale
+              readOnly: true
+            - name: secrets
+              mountPath: /etc/headplane/secrets
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/headplane
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: headplane-config
+        - name: headscale-config
+          # Read-only view of Headscale's own config.yaml (headscale.config_path)
+          # so Headplane can display current settings in the UI. Headplane
+          # cannot write changes back through this mount (kubernetes
+          # integration is disabled - see configmap.yaml) - it's display-only.
+          configMap:
+            name: headscale-config
+        - name: secrets
+          secret:
+            secretName: headplane-credentials
+        - name: data
+          persistentVolumeClaim:
+            claimName: headplane-data

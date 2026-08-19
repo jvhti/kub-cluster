@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: headplane-config
+  namespace: headscale
+data:
+  config.yaml: |
+    server:
+      host: "0.0.0.0"
+      port: 3000
+      base_url: "https://headscale-admin.jvos.dev"
+      cookie_secret_path: /etc/headplane/secrets/cookie-secret
+      cookie_secure: true
+      data_path: /var/lib/headplane
+
+    headscale:
+      # In-cluster Service DNS, straight to Headscale's own HTTPS listener -
+      # bypasses gateway-internal's TLS passthrough entirely (no need to
+      # route API calls through it, this is pod-to-pod). See
+      # infrastructure/controllers/headscale/ for why Headscale terminates
+      # its own TLS on 8443.
+      url: "https://headscale.headscale.svc.cluster.local:8443"
+      public_url: "https://headscale.jvos.dev"
+      config_path: /etc/headscale/config.yaml
+      api_key_path: /etc/headplane/secrets/headscale-api-key
+
+    integration:
+      agent:
+        enabled: false
+      docker:
+        enabled: false
+      kubernetes:
+        enabled: false # Sidecar/reload-signaling mode - not used, Headplane runs as its own separate Deployment talking to Headscale purely over its HTTP API
+      proc:
+        enabled: false
