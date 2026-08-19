@@ -39,6 +39,15 @@ spec:
       # listener) - the headscale-tls-passthrough listener below is scoped
       # to headscale.jvos.dev specifically, so the two don't overlap despite
       # sharing port 443.
+      #
+      # IMPORTANT: every HTTPRoute attached to this Gateway MUST set
+      # `parentRefs[].sectionName: https` explicitly. Without it, Cilium
+      # refuses to attach the route at all ("HTTPRoute is not allowed to
+      # attach to this Gateway due to route kind restrictions") now that a
+      # second listener (headscale-tls-passthrough, below) exists whose
+      # allowedRoutes.kinds is TLSRoute-only - confirmed live, broke every
+      # existing HTTPRoute on this Gateway simultaneously the moment that
+      # listener was added.
       tls:
         mode: Terminate
         certificateRefs:

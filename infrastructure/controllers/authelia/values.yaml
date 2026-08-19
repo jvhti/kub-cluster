@@ -156,6 +156,7 @@ ingress:
     parentRefs:
       - name: gateway-internal
         namespace: gateway
+        sectionName: https # Required since gateway-internal gained a third, TLSRoute-only listener (headscale-tls-passthrough) - see infrastructure/networking/gateway/gateway.yaml
 
 # Every secret_name referenced above (configMap.session.encryption_key,
 # configMap.storage.encryption_key, configMap.identity_providers.oidc.hmac_secret)
