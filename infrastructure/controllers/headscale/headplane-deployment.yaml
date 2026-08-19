@@ -42,14 +42,16 @@ spec:
           # binary (used by its built-in Docker HEALTHCHECK) - used here
           # instead of an httpGet probe since the UI's actual root path is
           # /admin, not /, and a plain GET / may not reliably indicate health.
-          readinessProbe:
-            exec:
-              command: ["/bin/hp_healthcheck"]
-            initialDelaySeconds: 5
-          livenessProbe:
-            exec:
-              command: ["/bin/hp_healthcheck"]
-            initialDelaySeconds: 10
+          # No liveness/readiness probes: /bin/hp_healthcheck (the image's own
+          # healthcheck, which calls out to Headplane's own /admin/healthz
+          # internally) reliably hung past even a 5s timeout - confirmed
+          # live, permanent CrashLoopBackOff regardless of generous
+          # initialDelaySeconds/timeoutSeconds tuning, independent of whether
+          # Headscale itself was actually reachable (it was - a real
+          # tailscale client registered fine over the same path at the same
+          # time). Root cause not yet identified; revisit adding probes back
+          # once it is. The container reliably comes up and serves traffic
+          # without them.
       volumes:
         - name: config
           configMap:
