@@ -16,6 +16,19 @@ spec:
         app: tailscale-router
     spec:
       serviceAccountName: tailscale-router
+      # Required for subnet routing / exit-node packet forwarding to actually
+      # work, not just for the boot script to stop hanging - confirmed live:
+      # "Subnet routing is enabled, but IP forwarding is disabled" health
+      # warning, and the boot script's own post-`tailscale up` consistency
+      # check hung for ~60s before giving up ("failed to auth tailscale:
+      # context deadline exceeded"), causing a permanent crash loop even
+      # though the client had already logged in successfully moments before.
+      securityContext:
+        sysctls:
+          - name: net.ipv4.ip_forward
+            value: "1"
+          - name: net.ipv6.conf.all.forwarding
+            value: "1"
       containers:
         - name: tailscale
           image: tailscale/tailscale:v1.102.2 # renovate: github-releases=tailscale/tailscale (Headscale 0.29's minimum supported client is v1.80 - see headscale/deployment.yaml)
