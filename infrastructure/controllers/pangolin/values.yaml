@@ -69,6 +69,17 @@ pangolin:
 
   ingressRoute:
     dashboard:
+      # The Cilium Gateway (infrastructure/networking/gateway/) already
+      # terminates public TLS with the *.jvos.dev wildcard cert and forwards
+      # plain HTTP to the backend Service - confirmed live: it does NOT
+      # re-encrypt to a backend's HTTPS port (websecure-only routing here
+      # returned 404, since the plain-HTTP request landed on a TLS listener
+      # with no matching route). `web` must be a valid entrypoint for the
+      # Gateway -> Traefik hop; `websecure` stays too for any direct/internal
+      # HTTPS access to Traefik itself.
+      entryPoints:
+        - web
+        - websecure
       tls:
         enabled: true
         certResolver: "" # Mutually exclusive with secretName - static cert, not ACME

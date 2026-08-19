@@ -21,7 +21,14 @@ spec:
         # oauth2-proxy gating here: Pangolin has its own identity/access-control
         # system (that's the point of deploying it), same reasoning as ArgoCD's own
         # HTTPRoute bypassing oauth2-proxy too.
+        #
+        # Port 80 (web), not 443: the Cilium Gateway already terminates public TLS
+        # with the *.jvos.dev wildcard cert (spec.listeners.https in
+        # infrastructure/networking/gateway/gateway.yaml) and forwards plain HTTP to
+        # backends - it does not re-encrypt to a backend's HTTPS port. Pointing this
+        # at Traefik's websecure (443) listener returned 404 (plain HTTP arriving on
+        # a TLS-only listener with no matching route) until this was fixed.
         - name: traefik
           namespace: pangolin
-          port: 443
+          port: 80
           weight: 1
