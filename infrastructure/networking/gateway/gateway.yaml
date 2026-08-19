@@ -35,6 +35,10 @@ spec:
     - name: https
       port: 443
       protocol: HTTPS
+      # No `hostname` here (matches every other *.jvos.dev app on this
+      # listener) - the headscale-tls-passthrough listener below is scoped
+      # to headscale.jvos.dev specifically, so the two don't overlap despite
+      # sharing port 443.
       tls:
         mode: Terminate
         certificateRefs:
@@ -42,3 +46,24 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: headscale-tls-passthrough
+      port: 443
+      protocol: TLS
+      hostname: "headscale.jvos.dev"
+      # Passthrough (not Terminate): Headscale must see and terminate the
+      # raw TLS connection itself using its own cert (infrastructure/
+      # controllers/headscale/certificate.yaml), because Cilium's Gateway
+      # API implementation hardcodes Envoy's HTTP upgradeConfigs to allow
+      # only the standard "websocket" type - Tailscale client registration
+      # needs a custom "tailscale-control-protocol" Upgrade header instead,
+      # which gets rejected with a bare 403 under HTTPS/Terminate mode
+      # (confirmed live, reproducibly - see infrastructure/controllers/
+      # headscale/tlsroute.yaml). TLS passthrough is pure SNI-based TCP
+      # routing, so Envoy never inspects/proxies the HTTP layer at all.
+      tls:
+        mode: Passthrough
+      allowedRoutes:
+        namespaces:
+          from: All
+        kinds:
+          - kind: TLSRoute

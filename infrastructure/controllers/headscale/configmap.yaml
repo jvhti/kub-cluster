@@ -6,10 +6,19 @@ metadata:
 data:
   config.yaml: |
     server_url: https://headscale.jvos.dev
-    listen_addr: 0.0.0.0:8080
+    listen_addr: 0.0.0.0:8443 # Unprivileged port - the Service (service.yaml) maps public 443 -> this
     metrics_listen_addr: 0.0.0.0:9090
     grpc_listen_addr: 0.0.0.0:50443
     grpc_allow_insecure: false
+
+    # Headscale terminates TLS itself rather than gateway-internal doing it -
+    # required for TLS passthrough (see the long comment in kustomization.yaml
+    # for why: Cilium's Gateway/Envoy rejects the custom
+    # "tailscale-control-protocol" Upgrade header client registration needs
+    # under normal HTTPS/Terminate routing). Cert issued by certificate.yaml,
+    # same cloudflare-cluster-issuer as the shared wildcard cert.
+    tls_cert_path: /etc/headscale/tls/tls.crt
+    tls_key_path: /etc/headscale/tls/tls.key
 
     database:
       type: sqlite

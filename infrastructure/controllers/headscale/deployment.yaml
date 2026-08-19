@@ -20,8 +20,8 @@ spec:
           image: headscale/headscale:0.23.0
           args: ["serve"]
           ports:
-            - name: http
-              containerPort: 8080
+            - name: https
+              containerPort: 8443
             - name: metrics
               containerPort: 9090
             - name: grpc
@@ -34,6 +34,9 @@ spec:
               mountPath: /var/lib/headscale
             - name: socket
               mountPath: /var/run/headscale
+            - name: tls
+              mountPath: /etc/headscale/tls
+              readOnly: true
           resources:
             requests:
               cpu: 50m
@@ -43,11 +46,11 @@ spec:
               memory: 256Mi
           readinessProbe:
             tcpSocket:
-              port: http
+              port: https
             initialDelaySeconds: 5
           livenessProbe:
             tcpSocket:
-              port: http
+              port: https
             initialDelaySeconds: 10
       volumes:
         - name: config
@@ -58,3 +61,6 @@ spec:
             claimName: headscale-data
         - name: socket
           emptyDir: {}
+        - name: tls
+          secret:
+            secretName: headscale-tls

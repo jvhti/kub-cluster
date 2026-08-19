@@ -10,6 +10,7 @@ env:
 
 sources:
   - gateway-httproute
+  - gateway-tlsroute # Added for headscale: it's TLS-passthrough (TLSRoute, not HTTPRoute) rather than L7-proxied - see infrastructure/controllers/headscale/tlsroute.yaml for why.
 
 domainFilters:
   - jvos.dev
