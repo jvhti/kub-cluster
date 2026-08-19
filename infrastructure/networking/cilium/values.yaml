@@ -42,6 +42,17 @@ k8sClientRateLimit:
   burst: 200
 l2announcements:
   enabled: true
+# By default, NetworkPolicy ipBlock rules do NOT match intra-cluster IPs
+# (pod/node IPs, including Service ClusterIPs like the kube-apiserver's) under
+# Cilium - confirmed live: Pangolin's controller egress rule
+# (cidr: 10.43.0.1/32, the `kubernetes` Service ClusterIP in infrastructure/
+# controllers/pangolin/values.yaml) rendered correctly but never actually
+# allowed the traffic, crash-looping the controller. `nodes` mode is the
+# smaller-blast-radius option (vs `pods`) and covers this case since the API
+# server runs on a control-plane node's IP. Cilium's own docs discourage this
+# at scale (extra security identities per CIDR-matched pod/node), but that
+# concern doesn't apply on this 3-node homelab cluster.
+policyCIDRMatchMode: nodes
 externalIPs:
   enabled: true
 loadBalancer:
