@@ -14,6 +14,7 @@ helmCharts:
     releaseName: traefik
     namespace: pangolin
     valuesFile: values.yaml
+    includeCRDs: true # IngressRoute/Middleware/etc - pangolin's controller reconciles against these
 
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "0" # After cloudnative-pg (-10); pangolin/ (5+) depends on this Traefik + its Certificate being ready
