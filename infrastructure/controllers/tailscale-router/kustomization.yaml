@@ -5,7 +5,8 @@ namespace: tailscale-router
 
 resources:
   - namespace.yaml
-  - pvc.yaml
+  - serviceaccount.yaml
+  - rbac.yaml
   - secrets.yaml
   - deployment.yaml
 

@@ -15,6 +15,7 @@ spec:
       labels:
         app: tailscale-router
     spec:
+      serviceAccountName: tailscale-router
       containers:
         - name: tailscale
           image: tailscale/tailscale:v1.76.6
@@ -24,8 +25,8 @@ spec:
                 secretKeyRef:
                   name: tailscale-authkey
                   key: TS_AUTHKEY
-            - name: TS_STATE_DIR
-              value: /var/lib/tailscale
+            - name: TS_KUBE_SECRET
+              value: tailscale # Node state (identity, keys) stored in this Kubernetes Secret instead of a file - see rbac.yaml for why, survives pod reschedule without needing a PVC
             - name: TS_USERSPACE
               value: "false" # Use the kernel WireGuard/TUN data path (needs NET_ADMIN + /dev/net/tun below) rather than userspace networking, so routes/exit-node actually forward packets
             - name: TS_EXTRA_ARGS
@@ -38,8 +39,6 @@ spec:
             capabilities:
               add: ["NET_ADMIN", "NET_RAW"]
           volumeMounts:
-            - name: state
-              mountPath: /var/lib/tailscale
             - name: tun
               mountPath: /dev/net/tun
           resources:
@@ -50,9 +49,6 @@ spec:
               cpu: 500m
               memory: 128Mi
       volumes:
-        - name: state
-          persistentVolumeClaim:
-            claimName: tailscale-state
         - name: tun
           hostPath:
             path: /dev/net/tun

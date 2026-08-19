@@ -1,0 +1,34 @@
+# tailscale/tailscale's container entrypoint auto-detects it's running in
+# Kubernetes and stores its node state (identity, keys) in a Kubernetes
+# Secret named "tailscale" rather than a plain file, so it can survive pod
+# reschedule without a PVC. This grants exactly the permissions its startup
+# check requires (confirmed via the real runtime error: "missing get/update
+# permission on secret \"tailscale\"") - scoped to this one Secret name via
+# resourceNames, not a blanket Secret get/update grant.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tailscale-router
+  namespace: tailscale-router
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["tailscale"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"] # Needed once, to create the "tailscale" Secret on first boot before it exists
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tailscale-router
+  namespace: tailscale-router
+subjects:
+  - kind: ServiceAccount
+    name: tailscale-router
+    namespace: tailscale-router
+roleRef:
+  kind: Role
+  name: tailscale-router
+  apiGroup: rbac.authorization.k8s.io
