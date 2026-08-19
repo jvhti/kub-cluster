@@ -1,0 +1,21 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: headscale
+  namespace: headscale
+spec:
+  parentRefs:
+    - name: gateway-internal
+      namespace: gateway
+  hostnames:
+    - "headscale.jvos.dev"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: headscale
+          namespace: headscale
+          port: 8080
+          weight: 1

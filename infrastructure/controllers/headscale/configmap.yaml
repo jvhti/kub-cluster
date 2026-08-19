@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: headscale-config
+  namespace: headscale
+data:
+  config.yaml: |
+    server_url: https://headscale.jvos.dev
+    listen_addr: 0.0.0.0:8080
+    metrics_listen_addr: 0.0.0.0:9090
+    grpc_listen_addr: 0.0.0.0:50443
+    grpc_allow_insecure: false
+
+    database:
+      type: sqlite
+      sqlite:
+        path: /var/lib/headscale/db.sqlite
+
+    noise:
+      private_key_path: /var/lib/headscale/noise_private.key
+
+    # MagicDNS domain devices are named under (e.g. mylaptop.tailnet.jvos.dev).
+    # Purely internal to the tailnet - Headscale serves this itself over the
+    # WireGuard mesh, it's never published in public jvos.dev DNS.
+    prefixes:
+      v4: 100.64.0.0/10
+      v6: fd7a:115c:a1e0::/48
+      allocation: sequential
+
+    dns:
+      magic_dns: true
+      base_domain: tailnet.jvos.dev
+      nameservers:
+        global:
+          - 1.1.1.1
+          - 1.0.0.1
+
+    # Embedded STUN/DERP server left disabled rather than exposed: clients
+    # fall back to Tailscale's public DERP relays for NAT traversal, which is
+    # simpler (no extra UDP port-forward on the router) and sufficient for a
+    # single-region homelab. Revisit if P2P connectivity between devices ends
+    # up poor.
+    derp:
+      server:
+        enabled: false
+      urls:
+        - https://controlplane.tailscale.com/derpmap/default
+      auto_update_enabled: true
+      update_frequency: 24h
+
+    unix_socket: /var/run/headscale/headscale.sock
+    unix_socket_permission: "0770"
+
+    log:
+      level: info

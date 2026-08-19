@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: headscale
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - httproute.yaml
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "7" # Same wave as gateway-internal itself (gateway/gateway.yaml) - both just need the wildcard Certificate (wave 6) issued first

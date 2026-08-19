@@ -16,7 +16,7 @@ configs:
         - >-
           select(.metadata.name as $n | [
             "authelia-crypto", "authelia-oidc-client", "authelia-users",
-            "oauth2-proxy-credentials"
+            "oauth2-proxy-credentials", "tailscale-authkey"
           ] | any($n == .)) | .data
   cmp:
     create: true

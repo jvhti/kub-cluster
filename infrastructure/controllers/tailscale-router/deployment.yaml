@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tailscale-router
+  namespace: tailscale-router
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # Single tailnet node identity persisted on the RWO volume - avoid two pods racing to use it
+  selector:
+    matchLabels:
+      app: tailscale-router
+  template:
+    metadata:
+      labels:
+        app: tailscale-router
+    spec:
+      containers:
+        - name: tailscale
+          image: tailscale/tailscale:v1.76.6
+          env:
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: tailscale-authkey
+                  key: TS_AUTHKEY
+            - name: TS_STATE_DIR
+              value: /var/lib/tailscale
+            - name: TS_USERSPACE
+              value: "false" # Use the kernel WireGuard/TUN data path (needs NET_ADMIN + /dev/net/tun below) rather than userspace networking, so routes/exit-node actually forward packets
+            - name: TS_EXTRA_ARGS
+              value: >-
+                --login-server=https://headscale.jvos.dev
+                --advertise-routes=192.168.1.0/24,10.42.0.0/16,10.2.0.0/16
+                --advertise-exit-node
+                --accept-routes
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN", "NET_RAW"]
+          volumeMounts:
+            - name: state
+              mountPath: /var/lib/tailscale
+            - name: tun
+              mountPath: /dev/net/tun
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: tailscale-state
+        - name: tun
+          hostPath:
+            path: /dev/net/tun
+            type: CharDevice
