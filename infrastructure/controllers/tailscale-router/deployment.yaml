@@ -40,6 +40,8 @@ spec:
                   key: TS_AUTHKEY
             - name: TS_KUBE_SECRET
               value: tailscale # Node state (identity, keys) stored in this Kubernetes Secret instead of a file - see rbac.yaml for why, survives pod reschedule without needing a PVC
+            - name: TS_AUTH_ONCE
+              value: "true" # Defaults to false, which forces a full fresh login/auth handshake on every container restart instead of reusing TS_KUBE_SECRET's persisted state - confirmed live as the likely cause of a repeating crash loop (boot script's post-login consistency check timing out roughly once a minute, "failed to auth tailscale: context deadline exceeded", despite the client itself logging in successfully each time first)
             - name: TS_USERSPACE
               value: "false" # Use the kernel WireGuard/TUN data path (needs NET_ADMIN + /dev/net/tun below) rather than userspace networking, so routes/exit-node actually forward packets
             - name: TS_EXTRA_ARGS
