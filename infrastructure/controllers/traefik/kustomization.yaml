@@ -5,6 +5,7 @@ namespace: pangolin
 
 resources:
   - certificate.yaml
+  - certificate-resources.yaml
   - httproute.yaml
 
 helmCharts:

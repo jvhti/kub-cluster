@@ -1,0 +1,22 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: p-jvos-dev-wildcard
+  namespace: pangolin
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1" # Before traefik's tlsStore/pangolin need the Secret
+spec:
+  # Covers Pangolin's Resource-hosting domain (pangolin.config.domains.domain1.base_domain
+  # in infrastructure/controllers/pangolin/values.yaml) - kept separate from the
+  # jvos.dev wildcard (infrastructure/networking/gateway/certificate.yaml) so
+  # Resources Pangolin creates dynamically (myservice.p.jvos.dev, ...) can never
+  # collide with this cluster's own app subdomains (gitea.jvos.dev, etc.).
+  # *.jvos.dev does NOT cover *.p.jvos.dev - a second-level wildcard needs its
+  # own Certificate/DNS-01 challenge, hence this separate resource.
+  secretName: p-jvos-dev-wildcard-tls
+  issuerRef:
+    name: cloudflare-cluster-issuer
+    kind: ClusterIssuer
+  dnsNames:
+    - "p.jvos.dev"
+    - "*.p.jvos.dev"
