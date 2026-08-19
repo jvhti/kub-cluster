@@ -22,8 +22,12 @@ data:
       # still stays inside the cluster/LAN via coredns-custom's split-horizon
       # override (infrastructure/networking/coredns-custom/) rather than
       # round-tripping out to the public IP.
-      url: "https://headscale.jvos.dev"
-      public_url: "https://headscale.jvos.dev"
+      # :8443 - Headscale's server_url (headscale/configmap.yaml) uses that
+      # port, since gateway-headscale shares the LAN's single WAN IP with
+      # gateway-internal via a second router port-forward rather than a
+      # second WAN IP.
+      url: "https://headscale.jvos.dev:8443"
+      public_url: "https://headscale.jvos.dev:8443"
       config_path: /etc/headscale/config.yaml
       api_key_path: /etc/headplane/secrets/headscale-api-key
 

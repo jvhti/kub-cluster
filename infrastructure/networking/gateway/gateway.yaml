@@ -35,19 +35,6 @@ spec:
     - name: https
       port: 443
       protocol: HTTPS
-      # No `hostname` here (matches every other *.jvos.dev app on this
-      # listener) - the headscale-tls-passthrough listener below is scoped
-      # to headscale.jvos.dev specifically, so the two don't overlap despite
-      # sharing port 443.
-      #
-      # IMPORTANT: every HTTPRoute attached to this Gateway MUST set
-      # `parentRefs[].sectionName: https` explicitly. Without it, Cilium
-      # refuses to attach the route at all ("HTTPRoute is not allowed to
-      # attach to this Gateway due to route kind restrictions") now that a
-      # second listener (headscale-tls-passthrough, below) exists whose
-      # allowedRoutes.kinds is TLSRoute-only - confirmed live, broke every
-      # existing HTTPRoute on this Gateway simultaneously the moment that
-      # listener was added.
       tls:
         mode: Terminate
         certificateRefs:
@@ -55,24 +42,10 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
-    - name: headscale-tls-passthrough
-      port: 443
-      protocol: TLS
-      hostname: "headscale.jvos.dev"
-      # Passthrough (not Terminate): Headscale must see and terminate the
-      # raw TLS connection itself using its own cert (infrastructure/
-      # controllers/headscale/certificate.yaml), because Cilium's Gateway
-      # API implementation hardcodes Envoy's HTTP upgradeConfigs to allow
-      # only the standard "websocket" type - Tailscale client registration
-      # needs a custom "tailscale-control-protocol" Upgrade header instead,
-      # which gets rejected with a bare 403 under HTTPS/Terminate mode
-      # (confirmed live, reproducibly - see infrastructure/controllers/
-      # headscale/tlsroute.yaml). TLS passthrough is pure SNI-based TCP
-      # routing, so Envoy never inspects/proxies the HTTP layer at all.
-      tls:
-        mode: Passthrough
-      allowedRoutes:
-        namespaces:
-          from: All
-        kinds:
-          - kind: TLSRoute
+# Headscale's TLSRoute passthrough listener deliberately does NOT live here -
+# see infrastructure/controllers/headscale/gateway.yaml for why (a genuine
+# Cilium v1.19.1 bug: adding a TLSRoute-serving listener alongside these
+# HTTPRoute-serving ones made the operator silently generate an empty/broken
+# CiliumEnvoyConfig for the HTTPRoute side - no errors logged, just wrong
+# output, confirmed live and survived both operator and full cilium
+# daemonset restarts. Took down every *.jvos.dev app simultaneously).

@@ -5,7 +5,13 @@ metadata:
   namespace: headscale
 data:
   config.yaml: |
-    server_url: https://headscale.jvos.dev
+    # :8443 because gateway-headscale (its own dedicated Gateway - see
+    # gateway.yaml for why it can't share gateway-internal) shares the LAN's
+    # single WAN IP with gateway-internal, which already owns external
+    # port 443 - the router forwards WAN:8443 -> this Gateway's VIP:443
+    # instead. Tailscale clients handle a non-default control-server port
+    # fine.
+    server_url: https://headscale.jvos.dev:8443
     listen_addr: 0.0.0.0:8443 # Unprivileged port - the Service (service.yaml) maps public 443 -> this
     metrics_listen_addr: 0.0.0.0:9090
     grpc_listen_addr: 0.0.0.0:50443

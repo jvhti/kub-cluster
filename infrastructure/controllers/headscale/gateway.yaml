@@ -1,0 +1,40 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gateway-headscale
+  namespace: headscale
+  annotations:
+    external-dns.alpha.kubernetes.io/target: "177.223.44.79" # Same public/WAN IP as gateway-internal - see gateway/gateway.yaml's own target annotation for the full reasoning
+spec:
+  gatewayClassName: cilium
+  addresses:
+    - type: IPAddress
+      value: 192.168.1.241 # Own LAN VIP, next free after gateway-internal's .240 (ip-pool.yaml in this dir)
+  listeners:
+    - name: tls-passthrough
+      port: 443
+      protocol: TLS
+      hostname: "headscale.jvos.dev"
+      # Passthrough (not Terminate): Headscale must see and terminate the raw
+      # TLS connection itself using its own cert (certificate.yaml), because
+      # Cilium's Gateway API implementation hardcodes Envoy's HTTP
+      # upgradeConfigs to allow only the standard "websocket" type -
+      # Tailscale client registration needs a custom
+      # "tailscale-control-protocol" Upgrade header instead, which gets
+      # rejected with a bare 403 under HTTPS/Terminate mode (confirmed live,
+      # reproducibly). TLS passthrough is pure SNI-based TCP routing, so
+      # Envoy never inspects/proxies the HTTP layer at all.
+      #
+      # A separate Gateway (rather than a second listener on gateway-internal
+      # alongside its HTTPRoute-serving ones) is required here - confirmed
+      # live: combining both listener types on one Gateway triggered a
+      # genuine Cilium v1.19.1 bug where the operator silently generated an
+      # empty/broken CiliumEnvoyConfig for the HTTPRoute side, taking down
+      # every *.jvos.dev app simultaneously with no errors logged anywhere.
+      tls:
+        mode: Passthrough
+      allowedRoutes:
+        namespaces:
+          from: Same
+        kinds:
+          - kind: TLSRoute

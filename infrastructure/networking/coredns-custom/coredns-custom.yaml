@@ -30,7 +30,7 @@ data:
             192.168.1.240 auth.jvos.dev
             192.168.1.240 argocd.jvos.dev
             192.168.1.240 longhorn.jvos.dev
-            192.168.1.240 headscale.jvos.dev
+            192.168.1.241 headscale.jvos.dev # Own dedicated Gateway/VIP, not gateway-internal's .240 - see infrastructure/controllers/headscale/gateway.yaml for why
             fallthrough
         }
         forward . /etc/resolv.conf

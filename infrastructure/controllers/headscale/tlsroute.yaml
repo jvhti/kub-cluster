@@ -5,9 +5,8 @@ metadata:
   namespace: headscale
 spec:
   parentRefs:
-    - name: gateway-internal
-      namespace: gateway
-      sectionName: headscale-tls-passthrough
+    - name: gateway-headscale
+      namespace: headscale
   hostnames:
     - "headscale.jvos.dev"
   rules:

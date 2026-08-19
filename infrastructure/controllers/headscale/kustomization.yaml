@@ -5,6 +5,8 @@ namespace: headscale
 
 resources:
   - namespace.yaml
+  - ip-pool.yaml
+  - gateway.yaml
   - certificate.yaml
   - configmap.yaml
   - pvc.yaml
@@ -25,23 +27,10 @@ resources:
   - headplane-service.yaml
   - headplane-httproute.yaml
 
-# TLSRoute (passthrough), not HTTPRoute (terminate) like every other app on
-# gateway-internal. Reason: Tailscale client registration upgrades the HTTP
-# connection with `Upgrade: tailscale-control-protocol` (Headscale's own
-# reverse-proxy docs: https://headscale.net/stable/ref/integration/reverse-
-# proxy/), but Cilium's Gateway API implementation hardcodes Envoy's
-# upgradeConfigs to allow only the standard "websocket" upgrade type -
-# confirmed live, reproducibly: the Noise handshake's initial GET succeeded
-# through an HTTPRoute/Terminate listener but the follow-up register POST
-# was rejected with a bare 403 before ever reaching Headscale's own
-# application logs (checked at debug level). Known open gap in Cilium, not
-# fixable via HTTPRoute config: https://github.com/cilium/cilium/issues/33767.
-#
-# TLS passthrough sidesteps it entirely - Envoy does pure SNI-based TCP
-# routing and never inspects/proxies the HTTP layer, so the custom Upgrade
-# header just flows through untouched to Headscale, which terminates its
-# own TLS (certificate.yaml) and serves HTTPS directly. Still shares
-# gateway-internal's single VIP/port 443 - see gateway/gateway.yaml's
-# headscale-tls-passthrough listener (keyed by hostname, not a separate IP).
+# Headscale gets its own dedicated Gateway (gateway.yaml) + TLSRoute, not an
+# HTTPRoute on the shared gateway-internal like every other app - see
+# gateway.yaml for the two independent reasons why (TLS passthrough for the
+# Noise protocol's custom Upgrade header, and a Cilium bug that rules out
+# combining route kinds on one Gateway).
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "7" # Same wave as gateway-internal itself (gateway/gateway.yaml) - both just need the ClusterIssuer (wave 5) ready to issue their respective Certificates
