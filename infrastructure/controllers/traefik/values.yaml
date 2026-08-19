@@ -9,7 +9,8 @@
 # ingress rides the existing Cilium Gateway via httproute.yaml, which forwards to
 # this Traefik's ClusterIP Service. Traefik itself never gets its own public IP/port.
 service:
-  type: ClusterIP
+  spec:
+    type: ClusterIP
 
 # TLS certs are cert-manager-issued Secrets (see certificate.yaml) referenced
 # directly on Pangolin's own IngressRoute (pangolin.ingressRoute.dashboard.tls

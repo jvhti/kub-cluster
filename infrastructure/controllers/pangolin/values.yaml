@@ -102,6 +102,16 @@ gerbil:
 
 networkPolicy:
   enabled: true
+  pangolin:
+    externalIngress:
+      # Default false - the chart assumes its own bundled Traefik subchart
+      # (same release/pod-network path) when this is left off. We run a
+      # separate, standalone Traefik release (infrastructure/controllers/traefik/)
+      # that reaches the dashboard UI (port 3002, "next") as a distinct pod, so
+      # this must be explicitly opened or Traefik's connection to Pangolin
+      # times out (confirmed live: 504 Gateway Timeout through Traefik's
+      # IngressRoute until this was set).
+      next: true
   gerbil:
     allowWireguardUdpEgress: true
     wireguardUdpCIDRs:
