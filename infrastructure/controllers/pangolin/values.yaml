@@ -135,6 +135,19 @@ gerbil:
 
 networkPolicy:
   enabled: true
+  controller:
+    egress:
+      enabled: true
+      kubernetesApi:
+        enabled: true
+        # Required - without it, no egress rule is rendered for K8s API access
+        # at all and the controller can't watch/list IngressRoute/Middleware/etc
+        # CRDs, crash-looping forever on a dial timeout (confirmed live: this
+        # was broken from the very first deploy, 16+ restarts before caught).
+        # ClusterIP of the `kubernetes` Service in the default namespace -
+        # confirm with `kubectl get svc kubernetes -n default` if this cluster's
+        # Service CIDR ever changes.
+        cidr: "10.43.0.1/32"
   pangolin:
     externalIngress:
       # Default false - the chart assumes its own bundled Traefik subchart
