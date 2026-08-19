@@ -30,6 +30,7 @@ data:
             192.168.1.240 auth.jvos.dev
             192.168.1.240 argocd.jvos.dev
             192.168.1.240 longhorn.jvos.dev
+            192.168.1.240 headscale.jvos.dev
             fallthrough
         }
         forward . /etc/resolv.conf
