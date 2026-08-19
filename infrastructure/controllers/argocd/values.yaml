@@ -2,6 +2,24 @@ configs:
   cm:
     create: true
     application.resourceTrackingMethod: "annotation+label"
+    # This repo's convention (see e.g. infrastructure/controllers/authelia/secrets.yaml)
+    # is to commit these Secrets empty and populate real values imperatively via
+    # `kubectl create secret ... | kubectl apply -f -` out-of-band. Without this,
+    # selfHeal: true (every Application's syncPolicy) reverts the live Secret back
+    # to its empty committed data on the next reconcile, silently wiping real
+    # credentials - confirmed happening in practice while rolling out Pangolin
+    # (infrastructure/controllers/pangolin/secrets.yaml). Scoped by name via
+    # jqPathExpressions rather than a blanket kind: Secret rule, so drift
+    # detection still works normally on every other Secret (including
+    # Helm/chart-generated ones in these same namespaces).
+    resource.customizations.ignoreDifferences.Secret: |
+      jqPathExpressions:
+        - >-
+          select(.metadata.name as $n | [
+            "authelia-crypto", "authelia-oidc-client", "authelia-users",
+            "oauth2-proxy-credentials",
+            "pangolin-server-secret", "pangolin-newt-credentials"
+          ] | any($n == .)) | .data
   cmp:
     create: true
     plugins:
