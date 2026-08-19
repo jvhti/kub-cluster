@@ -1,0 +1,37 @@
+# In-cluster clients resolve headscale.jvos.dev to gateway-headscale's VIP
+# (192.168.1.241, see coredns-custom's split-horizon override) but that only
+# rewrites the IP, not the port - server_url (configmap.yaml) is :8443,
+# matching what EXTERNAL clients need through the router's port-forward
+# (WAN:8443 -> 192.168.1.241:443), but nothing in-cluster listens on 8443:
+# the Gateway itself only ever listens on 443. Confirmed live: Headplane's
+# API-key validation and a plain curl both hung indefinitely trying
+# 192.168.1.241:8443.
+#
+# This Service+EndpointSlice pair exists purely to remap that port for
+# in-cluster clients: anything resolving headscale.jvos.dev to this
+# Service's ClusterIP and connecting on :8443 gets forwarded to
+# gateway-headscale's real VIP:443, with no actual proxy pod needed - the
+# port remap happens at the kube-proxy/Cilium service layer.
+apiVersion: v1
+kind: Service
+metadata:
+  name: headscale-external-port
+  namespace: headscale
+spec:
+  ports:
+    - port: 8443
+      targetPort: 443
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: headscale-external-port
+  namespace: headscale
+  labels:
+    kubernetes.io/service-name: headscale-external-port
+addressType: IPv4
+ports:
+  - port: 443
+endpoints:
+  - addresses:
+      - "192.168.1.241"

@@ -12,6 +12,7 @@ resources:
   - pvc.yaml
   - deployment.yaml
   - service.yaml
+  - service-external-port.yaml
   - tlsroute.yaml
   # Headplane: web admin UI for Headscale (headscale.jvos.dev has no web UI
   # of its own, only API/control endpoints). Deployed into this same
