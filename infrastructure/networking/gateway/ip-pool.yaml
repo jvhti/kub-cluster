@@ -13,7 +13,7 @@ spec:
   # main-pool.
   blocks:
     - start: "192.168.1.240"
-      stop: "192.168.1.250" # Free range outside observed LAN/DHCP activity (.1, .10, .16 seen in use) — verify against your router's DHCP pool if it's ever widened.
+      stop: "192.168.1.240" # Single IP - gateway-internal only ever needs the one it's pinned to (gateway.yaml). Was a wider range (.240-.250); shrunk to stop overlapping infrastructure/controllers/headscale/ip-pool.yaml's .241 - Cilium rejects overlapping CiliumLoadBalancerIPPool ranges outright regardless of disjoint serviceSelectors (confirmed live: PoolConflict/cidr_overlap, left gateway-headscale's Service stuck <pending> and its Gateway "Address not ready yet"). Verify against your router's DHCP pool if this or headscale's .241 ever needs to move.
   serviceSelector:
     matchLabels:
       "io.kubernetes.service.namespace": "gateway"
