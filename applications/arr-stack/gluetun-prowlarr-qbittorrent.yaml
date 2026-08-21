@@ -1,0 +1,166 @@
+# gluetun, prowlarr, and qbittorrent as one Deployment (one Pod, three
+# containers) rather than three separate Deployments. This is the k8s
+# equivalent of the TrueNAS/Docker Compose setup being migrated
+# (prowlarr and qbittorrent both ran with `network_mode:
+# container:ix-gluetun-gluetun-1`, i.e. sharing gluetun's network
+# namespace entirely) — containers in the same Pod already share a
+# network namespace by default, so putting all three in one Pod gives
+# the same "every byte routes through the VPN" property with no special
+# wiring, as long as gluetun is the one holding NET_ADMIN + /dev/net/tun
+# and prowlarr/qbittorrent have no ports/networking config of their own.
+#
+# FIREWALL_OUTBOUND_SUBNETS carries both the physical LAN (192.168.1.0/24,
+# matching the original TrueNAS gluetun config) and the whole 10.0.0.0/8
+# cluster+NFS range (pod CIDR 10.42.0.0/24, service CIDR 10.43.0.0/16,
+# TrueNAS itself at 10.0.0.5) — traffic to either bypasses the tunnel so
+# in-cluster access (HTTPRoute, other *arr services, NFS) and LAN clients
+# keep working, while everything else (indexers, torrent peers) goes
+# through AirVPN.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gluetun
+  namespace: arr
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # Single pod fronting shared NFS config dirs — avoid two pods racing to use them
+  selector:
+    matchLabels:
+      app: gluetun
+  template:
+    metadata:
+      labels:
+        app: gluetun
+    spec:
+      containers:
+        - name: gluetun
+          image: qmcgaw/gluetun:v3.41
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
+          volumeMounts:
+            - name: tun
+              mountPath: /dev/net/tun
+          env:
+            - name: VPN_SERVICE_PROVIDER
+              value: airvpn
+            - name: VPN_TYPE
+              value: wireguard
+            - name: SERVER_REGIONS
+              value: America
+            - name: VPN_PORT_FORWARDING
+              value: "off"
+            - name: PORT_FORWARD_ONLY
+              value: "off"
+            - name: FIREWALL_VPN_INPUT_PORTS
+              value: "58387"
+            - name: FIREWALL_OUTBOUND_SUBNETS
+              value: 192.168.1.0/24,10.0.0.0/8
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: WIREGUARD_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gluetun-wireguard
+                  key: WIREGUARD_PRIVATE_KEY
+            - name: WIREGUARD_PRESHARED_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gluetun-wireguard
+                  key: WIREGUARD_PRESHARED_KEY
+            - name: WIREGUARD_ADDRESSES
+              valueFrom:
+                secretKeyRef:
+                  name: gluetun-wireguard
+                  key: WIREGUARD_ADDRESSES
+          ports:
+            - containerPort: 30050 # prowlarr webui
+            - containerPort: 30024 # qbittorrent webui
+            - containerPort: 51413 # qbittorrent torrenting, tcp
+              protocol: TCP
+            - containerPort: 51413 # qbittorrent torrenting, udp
+              protocol: UDP
+          readinessProbe:
+            httpGet:
+              path: / # gluetun's built-in health server (HEALTH_SERVER_ADDRESS, default 127.0.0.1:9999) — 200 once the VPN tunnel is actually up, 500 otherwise
+              port: 9999
+            initialDelaySeconds: 15
+            periodSeconds: 10
+        - name: prowlarr
+          image: ghcr.io/home-operations/prowlarr:2.3.4
+          securityContext:
+            runAsUser: 580
+            runAsGroup: 580
+          env:
+            - name: PROWLARR__APP__INSTANCENAME
+              value: Prowlarr
+            - name: PROWLARR__SERVER__PORT
+              value: "30050"
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: UMASK
+              value: "002"
+          volumeMounts:
+            - name: prowlarr-config
+              mountPath: /config
+        - name: qbittorrent
+          image: ghcr.io/home-operations/qbittorrent:5.1.4
+          securityContext:
+            runAsUser: 580
+            runAsGroup: 580
+          env:
+            - name: QBT_WEBUI_PORT
+              value: "30024"
+            - name: QBT_TORRENTING_PORT
+              value: "51413"
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: UMASK
+              value: "002"
+          volumeMounts:
+            - name: qbittorrent-config
+              mountPath: /config
+            - name: media
+              mountPath: /data
+      volumes:
+        - name: prowlarr-config
+          persistentVolumeClaim:
+            claimName: arr-prowlarr-config
+        - name: qbittorrent-config
+          persistentVolumeClaim:
+            claimName: arr-qbittorrent-config
+        - name: media
+          persistentVolumeClaim:
+            claimName: arr-media
+        - name: tun
+          hostPath:
+            path: /dev/net/tun
+            type: CharDevice
+---
+# One Service per app, all selecting the same gluetun Pod (its containers
+# share one network namespace, so every container port is reachable at
+# the Pod's IP regardless of which container actually listens on it).
+apiVersion: v1
+kind: Service
+metadata:
+  name: prowlarr
+  namespace: arr
+spec:
+  selector:
+    app: gluetun
+  ports:
+    - port: 30050
+      targetPort: 30050
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qbittorrent
+  namespace: arr
+spec:
+  selector:
+    app: gluetun
+  ports:
+    - port: 30024
+      targetPort: 30024

@@ -63,6 +63,8 @@ block — same set of hostnames, same targets.
 | `prometheus.jvos.dev` | `192.168.1.240` |
 | `longhorn.jvos.dev` | `192.168.1.240` |
 | `fotos.jvos.dev` | `192.168.1.240` |
+| `prowlarr.jvos.dev` | `192.168.1.240` |
+| `qbittorrent.jvos.dev` | `192.168.1.240` |
 | `headscale.jvos.dev` | `192.168.1.241` |
 
 ## Adding a new hostname later

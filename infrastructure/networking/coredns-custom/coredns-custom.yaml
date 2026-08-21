@@ -44,6 +44,8 @@ data:
             # server_url was :8443 but nothing in-cluster listened on that
             # port - see that configmap's comment for the history.
             192.168.1.241 headscale.jvos.dev
+            192.168.1.240 prowlarr.jvos.dev
+            192.168.1.240 qbittorrent.jvos.dev
             fallthrough
         }
         forward . /etc/resolv.conf
