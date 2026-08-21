@@ -152,6 +152,20 @@ configMap:
             - 'authorization_code'
           response_types:
             - 'code'
+          # Chart default is client_secret_basic, but oauth2-proxy's OIDC
+          # provider (legacy --upstream/extraArgs mode, no flag exists to
+          # change this) always sends the client secret via
+          # client_secret_post at the token endpoint instead — confirmed
+          # live via a real login attempt against the degoog client below,
+          # which hit "invalid_client ... token_endpoint_auth_method
+          # 'client_secret_post', however the OAuth 2.0 client registration
+          # does not allow this method". This client shares the exact same
+          # oauth2-proxy chart/args shape, so it was hitting the identical
+          # failure on every login — just not noticed yet since it hadn't
+          # been logged into recently. Explicitly allowing
+          # client_secret_post here is the fix, not changing oauth2-proxy
+          # (it has no config for this).
+          token_endpoint_auth_method: 'client_secret_post'
         - client_id: 'oauth2-proxy-degoog'
           client_name: 'oauth2-proxy (degoog)'
           client_secret:
@@ -169,6 +183,7 @@ configMap:
             - 'authorization_code'
           response_types:
             - 'code'
+          token_endpoint_auth_method: 'client_secret_post' # see the oauth2-proxy client's comment above — same root cause, same fix.
 
 ingress:
   # Top-level master switch, separate from gatewayAPI.enabled below — chart
