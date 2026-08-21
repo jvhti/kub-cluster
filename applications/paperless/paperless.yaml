@@ -97,22 +97,38 @@ spec:
           # startupProbe (generous failureThreshold, not counted against
           # liveness until it passes once) is the right tool here rather
           # than just stretching liveness's own delay.
+          #
+          # timeoutSeconds is widened on all three probes (default is 1s)
+          # — confirmed live: a liveness probe hit "context deadline
+          # exceeded" against a running, otherwise-healthy pod (GET /
+          # redirects to /accounts/login/?next=/, one extra hop past a
+          # bare 200) and killed it, causing a real user-facing 503 while
+          # it restarted. This app does real CPU work (OCR/PDF rendering)
+          # on the same process that also serves HTTP, so an occasional
+          # slow response is expected, not a sign it's actually down —
+          # failureThreshold is widened too so one slow beat doesn't kill
+          # the pod outright.
           startupProbe:
             httpGet:
               path: /
               port: 8000
             failureThreshold: 60
             periodSeconds: 10
+            timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: /
               port: 8000
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /
               port: 8000
             periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 5
       volumes:
         - name: data
           persistentVolumeClaim:
