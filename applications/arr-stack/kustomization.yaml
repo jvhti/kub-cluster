@@ -7,4 +7,5 @@ resources:
   - namespace.yaml
   - storage.yaml
   - gluetun-prowlarr-qbittorrent.yaml
+  - sonarr-radarr-bazarr.yaml
   - httproute.yaml

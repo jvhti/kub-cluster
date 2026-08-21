@@ -46,6 +46,9 @@ data:
             192.168.1.241 headscale.jvos.dev
             192.168.1.240 prowlarr.jvos.dev
             192.168.1.240 qbittorrent.jvos.dev
+            192.168.1.240 sonarr.jvos.dev
+            192.168.1.240 radarr.jvos.dev
+            192.168.1.240 bazarr.jvos.dev
             fallthrough
         }
         forward . /etc/resolv.conf

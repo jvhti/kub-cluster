@@ -69,6 +69,99 @@ spec:
 apiVersion: v1
 kind: PersistentVolume
 metadata:
+  name: arr-sonarr-config
+spec:
+  capacity:
+    storage: 10Gi # nominal — NFS doesn't enforce this
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: arr-sonarr-config
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: 10.0.0.5
+    path: /mnt/General/arr/configs/sonarr
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: arr-sonarr-config
+  namespace: arr
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: arr-sonarr-config
+  resources:
+    requests:
+      storage: 10Gi
+  volumeName: arr-sonarr-config
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: arr-radarr-config
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: arr-radarr-config
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: 10.0.0.5
+    path: /mnt/General/arr/configs/radarr
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: arr-radarr-config
+  namespace: arr
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: arr-radarr-config
+  resources:
+    requests:
+      storage: 10Gi
+  volumeName: arr-radarr-config
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: arr-bazarr-config
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: arr-bazarr-config
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: 10.0.0.5
+    path: /mnt/General/arr/configs/bazarr
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: arr-bazarr-config
+  namespace: arr
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: arr-bazarr-config
+  resources:
+    requests:
+      storage: 10Gi
+  volumeName: arr-bazarr-config
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
   name: arr-media
 spec:
   capacity:

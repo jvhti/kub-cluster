@@ -1,0 +1,172 @@
+# Sonarr, Radarr, and Bazarr as three separate Deployments — unlike
+# prowlarr/qbittorrent, TrueNAS ran these with network_mode: None (not
+# container:ix-gluetun-gluetun-1), confirmed live via the app's
+# active_workloads.container_details[].network_mode. They only need to
+# reach prowlarr/qbittorrent/each other and the *arr indexers over plain
+# HTTP(S) — the actual torrent traffic that needs VPN egress is
+# qbittorrent's alone — so no gluetun netns-sharing needed here, each gets
+# its own Pod + Service like any normal in-cluster app.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sonarr
+  namespace: arr
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # single pod on a shared NFS config dir — avoid two pods racing to use it
+  selector:
+    matchLabels:
+      app: sonarr
+  template:
+    metadata:
+      labels:
+        app: sonarr
+    spec:
+      containers:
+        - name: sonarr
+          image: ghcr.io/home-operations/sonarr:4.0.19.3001
+          securityContext:
+            runAsUser: 580
+            runAsGroup: 580
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: UMASK
+              value: "002"
+          ports:
+            - containerPort: 8989
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: media
+              mountPath: /data
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: arr-sonarr-config
+        - name: media
+          persistentVolumeClaim:
+            claimName: arr-media
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sonarr
+  namespace: arr
+spec:
+  selector:
+    app: sonarr
+  ports:
+    - port: 8989
+      targetPort: 8989
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: radarr
+  namespace: arr
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: radarr
+  template:
+    metadata:
+      labels:
+        app: radarr
+    spec:
+      containers:
+        - name: radarr
+          image: ghcr.io/home-operations/radarr:6.4.1.10545
+          securityContext:
+            runAsUser: 580
+            runAsGroup: 580
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: UMASK
+              value: "002"
+          ports:
+            - containerPort: 7878
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: media
+              mountPath: /data
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: arr-radarr-config
+        - name: media
+          persistentVolumeClaim:
+            claimName: arr-media
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: radarr
+  namespace: arr
+spec:
+  selector:
+    app: radarr
+  ports:
+    - port: 7878
+      targetPort: 7878
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bazarr
+  namespace: arr
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: bazarr
+  template:
+    metadata:
+      labels:
+        app: bazarr
+    spec:
+      containers:
+        - name: bazarr
+          image: ghcr.io/home-operations/bazarr:1.6.0
+          securityContext:
+            runAsUser: 580
+            runAsGroup: 580
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: UMASK
+              value: "002"
+          ports:
+            - containerPort: 6767
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: media
+              mountPath: /data
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: arr-bazarr-config
+        - name: media
+          persistentVolumeClaim:
+            claimName: arr-media
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bazarr
+  namespace: arr
+spec:
+  selector:
+    app: bazarr
+  ports:
+    - port: 6767
+      targetPort: 6767
