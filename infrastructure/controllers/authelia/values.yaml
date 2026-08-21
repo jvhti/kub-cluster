@@ -35,6 +35,12 @@ pod:
         items:
           - key: client-secret-hash
             path: client-secret-hash.txt
+    - name: oidc-client-secret-degoog
+      secret:
+        secretName: authelia-oidc-client-degoog
+        items:
+          - key: client-secret-hash
+            path: client-secret-hash.txt
   extraVolumeMounts:
     - name: users-database
       mountPath: /config/users_database.yml
@@ -46,6 +52,10 @@ pod:
       readOnly: true
     - name: oidc-client-secret
       mountPath: /secrets/client-secret-hash.txt
+      subPath: client-secret-hash.txt
+      readOnly: true
+    - name: oidc-client-secret-degoog
+      mountPath: /secrets/client-secret-hash-degoog.txt
       subPath: client-secret-hash.txt
       readOnly: true
 
@@ -133,6 +143,23 @@ configMap:
           authorization_policy: 'one_factor'
           redirect_uris:
             - 'https://longhorn.jvos.dev/oauth2/callback'
+          scopes:
+            - 'openid'
+            - 'profile'
+            - 'email'
+            - 'groups'
+          grant_types:
+            - 'authorization_code'
+          response_types:
+            - 'code'
+        - client_id: 'oauth2-proxy-degoog'
+          client_name: 'oauth2-proxy (degoog)'
+          client_secret:
+            path: '/secrets/client-secret-hash-degoog.txt'
+          public: false
+          authorization_policy: 'one_factor'
+          redirect_uris:
+            - 'https://search.jvos.dev/oauth2/callback'
           scopes:
             - 'openid'
             - 'profile'

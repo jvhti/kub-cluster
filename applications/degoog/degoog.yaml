@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: degoog
+  namespace: degoog
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # RWO Longhorn data PVC — a RollingUpdate would try to attach it to two pods at once
+  selector:
+    matchLabels:
+      app: degoog
+  template:
+    metadata:
+      labels:
+        app: degoog
+    spec:
+      # Same collision class documented in applications/paperless/paperless.yaml:
+      # Kubernetes auto-injects a <SVCNAME>_PORT env var for every Service
+      # visible to the pod (legacy Docker-links convention), and since the
+      # Service below is also named "degoog", that becomes
+      # DEGOOG_PORT=tcp://<clusterIP>:4444 — degoog reads DEGOOG_PORT itself
+      # as its listen port, so an unquoted "tcp://..." value would break
+      # startup. Disabling service-links avoids the whole class of collision
+      # for any other DEGOOG_* var a future same-named Service might
+      # introduce, on top of the explicit DEGOOG_PORT override below.
+      enableServiceLinks: false
+      containers:
+        - name: degoog
+          image: ghcr.io/degoog-org/degoog:latest
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: DEGOOG_PORT
+              value: "4444"
+            - name: DEGOOG_BASE_URL
+              value: https://search.jvos.dev
+            # Public instance (routed on gateway-internal like every other
+            # *.jvos.dev app — see infrastructure/networking/gateway/ — and
+            # reachable from the internet via the DMZ-forwarder LXC/wildcard
+            # cert, same as paperless.jvos.dev etc). This flag is degoog's
+            # own app-level safety switch restricting the settings/extension
+            # UI when internet-exposed; it's on top of, not instead of, the
+            # oauth2-proxy gate in front of it (httproute.yaml) — this
+            # instance is public AND behind auth.
+            - name: DEGOOG_PUBLIC_INSTANCE
+              value: "true"
+            - name: DEGOOG_VALKEY_URL
+              value: redis://degoog-valkey:6379
+            # DEGOOG_DBUSER/DEGOOG_DBPASS must be defined before
+            # DEGOOG_POSTGRES below — Kubernetes only resolves a $(VAR)
+            # reference against env vars defined earlier in this same list,
+            # in order; swapping the order would pass the literal string
+            # "$(DEGOOG_DBUSER)" instead of the secret value.
+            - name: DEGOOG_DBUSER
+              valueFrom:
+                secretKeyRef:
+                  name: degoog-postgres-app
+                  key: username
+            - name: DEGOOG_DBPASS
+              valueFrom:
+                secretKeyRef:
+                  name: degoog-postgres-app
+                  key: password
+            # Unlike paperless-ngx (PAPERLESS_DBUSER/PAPERLESS_DBPASS as
+            # discrete fields), degoog only accepts a single connection URL
+            # — no split host/user/pass alternative (confirmed against its
+            # env-var docs). cnpg's auto-generated `app` user password is
+            # alphanumeric only (no URL-reserved characters), so building
+            # the URL this way is safe as-is; if that default generation
+            # behavior ever changes, this would need percent-encoding.
+            - name: DEGOOG_POSTGRES
+              value: postgresql://$(DEGOOG_DBUSER):$(DEGOOG_DBPASS)@degoog-postgres-rw:5432/degoog
+            - name: DEGOOG_SETTINGS_PASSWORDS
+              valueFrom:
+                secretKeyRef:
+                  name: degoog-secrets
+                  key: DEGOOG_SETTINGS_PASSWORDS
+          ports:
+            - containerPort: 4444
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 4444
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 4444
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: degoog-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: degoog
+  namespace: degoog
+spec:
+  selector:
+    app: degoog
+  ports:
+    - port: 4444
+      targetPort: 4444

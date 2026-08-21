@@ -73,6 +73,7 @@ block — same set of hostnames, same targets.
 | `jellystat.jvos.dev` | `192.168.1.240` |
 | `books.jvos.dev` | `192.168.1.240` |
 | `paperless.jvos.dev` | `192.168.1.240` |
+| `search.jvos.dev` | `192.168.1.240` |
 | `headscale.jvos.dev` | `192.168.1.241` |
 
 ## Adding a new hostname later
