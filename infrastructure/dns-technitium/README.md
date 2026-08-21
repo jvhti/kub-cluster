@@ -46,7 +46,7 @@ complexity for the same end result a hand-maintained zone gets more simply
 discipline, so this isn't a new maintenance burden, just the same one
 applied to a second DNS server.
 
-## Records (as of 2026-08-21, paperless-ngx deployment)
+## Records (as of 2026-08-21, memos deployment)
 
 All TTL 300s. Keep this list in sync with `coredns-custom.yaml`'s `hosts`
 block — same set of hostnames, same targets.
@@ -74,6 +74,7 @@ block — same set of hostnames, same targets.
 | `books.jvos.dev` | `192.168.1.240` |
 | `paperless.jvos.dev` | `192.168.1.240` |
 | `search.jvos.dev` | `192.168.1.240` |
+| `memos.jvos.dev` | `192.168.1.240` |
 | `headscale.jvos.dev` | `192.168.1.241` |
 
 ## Adding a new hostname later

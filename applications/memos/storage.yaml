@@ -1,0 +1,62 @@
+# memos' MEMOS_DATA dir (the container's /var/opt/memos) on Longhorn. The
+# database itself lives in CNPG Postgres (postgres-cluster.yaml), not here,
+# so this PVC only ever holds small local state — no WAL-mode SQLite concern
+# for this volume.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: memos-data
+  namespace: memos
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi
+---
+# Uploaded media (photos/attachments), on a dedicated new TrueNAS dataset —
+# same "new dataset for bulk media" convention as immich/uploads. Mounted at
+# /var/opt/memos/assets specifically: memos' Local Filesystem storage backend
+# resolves a relative filepathTemplate (default
+# "assets/{timestamp}_{uuid}_{filename}") against MEMOS_DATA (confirmed
+# directly from memos' own source,
+# server/router/api/v1/attachment_service_storage.go's SaveAttachmentBlob —
+# `internalPath = filepath.Join(profile.Data, internalPath)` when the
+# template is relative and profile.Data defaults to /var/opt/memos). Putting
+# the NFS mount at exactly /var/opt/memos/assets means the stock "assets/..."
+# template already lands every uploaded file on TrueNAS with zero extra
+# config beyond flipping the storage type to Local in the admin UI (see
+# memos.yaml's comment on that one-time manual step — it's a workspace
+# setting stored in the database, not an env var, so it can't be set
+# declaratively here).
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: memos-assets
+spec:
+  capacity:
+    storage: 1Ti # nominal — NFS doesn't enforce this, ZFS quota (if any) is the real limit
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: memos-assets
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: 10.0.0.5
+    path: /mnt/General/memos/assets
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: memos-assets
+  namespace: memos
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: memos-assets
+  resources:
+    requests:
+      storage: 1Ti
+  volumeName: memos-assets

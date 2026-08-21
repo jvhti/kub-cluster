@@ -1,0 +1,25 @@
+# memos' own Postgres, via CloudNativePG — same pattern as
+# applications/degoog/postgres-cluster.yaml and
+# applications/immich/postgres-cluster.yaml. Single instance, no HA, homelab
+# scale. Used instead of memos' default SQLite specifically to avoid ever
+# needing to put a WAL-mode SQLite db on the TrueNAS NFS export (see
+# docs/truenas-app-migrations.md's "Don't put a WAL-mode SQLite db on NFS")
+# — memos' own data dir (MEMOS_DATA) has to have its assets/ subdirectory
+# NFS-backed for media (see storage.yaml), so the database itself is kept
+# off that volume entirely by using Postgres instead.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: memos-postgres
+  namespace: memos
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17-bookworm
+  storage:
+    size: 5Gi
+    storageClass: longhorn
+  bootstrap:
+    initdb:
+      database: memos
+      owner: memos
+  enablePDB: false

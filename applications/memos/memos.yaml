@@ -1,0 +1,99 @@
+# memos (https://usememos.com) — self-hosted micro-blogging/notes.
+# Single standalone Deployment, no gluetun netns needed — it only serves
+# HTTP to LAN/Gateway clients, same shape as kavita/jellyfin-style apps.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: memos
+  namespace: memos
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # RWO Longhorn data PVC — a RollingUpdate would try to attach it to two pods at once
+  selector:
+    matchLabels:
+      app: memos
+  template:
+    metadata:
+      labels:
+        app: memos
+    spec:
+      containers:
+        - name: memos
+          image: neosmemo/memos:stable
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: MEMOS_PORT
+              value: "5230"
+            - name: MEMOS_DATA
+              value: /var/opt/memos
+            - name: MEMOS_DRIVER
+              value: postgres
+            # MEMOS_DBUSER/MEMOS_DBPASS must be defined before MEMOS_DSN
+            # below — Kubernetes only resolves a $(VAR) reference against
+            # env vars defined earlier in this same list, in order.
+            - name: MEMOS_DBUSER
+              valueFrom:
+                secretKeyRef:
+                  name: memos-postgres-app
+                  key: username
+            - name: MEMOS_DBPASS
+              valueFrom:
+                secretKeyRef:
+                  name: memos-postgres-app
+                  key: password
+            - name: MEMOS_DSN
+              value: postgresql://$(MEMOS_DBUSER):$(MEMOS_DBPASS)@memos-postgres-rw:5432/memos?sslmode=disable
+            # Public instance (routed on gateway-internal, reachable from
+            # the internet via the DMZ-forwarder LXC/wildcard cert, same as
+            # search.jvos.dev) — but gated by the dedicated
+            # oauth2-proxy-memos instance in front of it (httproute.yaml),
+            # same pattern as degoog.
+            - name: MEMOS_INSTANCE_URL
+              value: https://memos.jvos.dev
+          ports:
+            - containerPort: 5230
+          volumeMounts:
+            - name: data
+              mountPath: /var/opt/memos
+            # Mounted at exactly assets/ under MEMOS_DATA so memos' stock
+            # Local Filesystem filepathTemplate ("assets/{timestamp}_{uuid}_{filename}")
+            # writes straight onto the TrueNAS-backed volume with no custom
+            # template needed — see storage.yaml's comment for the source
+            # confirmation of this path resolution.
+            - name: assets
+              mountPath: /var/opt/memos/assets
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 5230
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 5230
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: memos-data
+        - name: assets
+          persistentVolumeClaim:
+            claimName: memos-assets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: memos
+  namespace: memos
+spec:
+  selector:
+    app: memos
+  ports:
+    - port: 5230
+      targetPort: 5230
