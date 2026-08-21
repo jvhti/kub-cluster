@@ -30,6 +30,11 @@ data:
             192.168.1.240 auth.jvos.dev
             192.168.1.240 argocd.jvos.dev
             192.168.1.240 longhorn.jvos.dev
+            192.168.1.240 gitea.jvos.dev
+            192.168.1.240 headscale-admin.jvos.dev
+            192.168.1.240 alertmanager.jvos.dev
+            192.168.1.240 grafana.jvos.dev
+            192.168.1.240 prometheus.jvos.dev
             # gateway-headscale's own VIP directly, same as every other
             # entry here - safe now that server_url is plain :443
             # (headscale/configmap.yaml), matching what the Gateway itself
