@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wireguard
+  namespace: wireguard
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # Single RWO volume holding peer keys/configs - avoid two pods racing to use it
+  selector:
+    matchLabels:
+      app: wireguard
+  template:
+    metadata:
+      labels:
+        app: wireguard
+    spec:
+      # Required for the WireGuard kernel module data path to actually
+      # forward packets, not just for wg-quick to come up - same pattern as
+      # tailscale-router's securityContext.sysctls (see that Deployment's
+      # comment for the confirmed-live failure mode this avoids).
+      securityContext:
+        sysctls:
+          - name: net.ipv4.ip_forward
+            value: "1"
+          - name: net.ipv4.conf.all.src_valid_mark
+            value: "1"
+      containers:
+        - name: wireguard
+          image: lscr.io/linuxserver/wireguard:latest # renovate: github-releases=linuxserver/docker-wireguard - pin to a real version once Renovate opens its first PR; using latest for now rather than guess an exact tag
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: TZ
+              value: Etc/UTC
+            # Baked into generated peer .conf files' Endpoint field - external
+            # clients connect here. DNS record (wg.jvos.dev -> WAN IP) created
+            # manually in Cloudflare, same as gateway-internal's WAN target -
+            # external-dns only watches Gateway API HTTPRoute/TLSRoute
+            # sources (infrastructure/networking/external-dns/values.yaml),
+            # not plain Services, so it can't pick this up automatically.
+            - name: SERVERURL
+              value: wg.jvos.dev
+            - name: SERVERPORT
+              value: "51820"
+            - name: PEERS
+              value: phone,laptop
+            - name: PEERDNS
+              value: auto
+            - name: INTERNAL_SUBNET
+              value: 10.13.13.0
+            - name: ALLOWEDIPS
+              value: 0.0.0.0/0 # Full-tunnel per peer config; each client still chooses whether to actually route all traffic through it
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN", "SYS_MODULE"]
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: modules
+              mountPath: /lib/modules
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: wireguard-config
+        - name: modules
+          hostPath:
+            path: /lib/modules
+            type: Directory

@@ -1,0 +1,23 @@
+# Plain NodePort, deliberately NOT a Cilium LoadBalancer VIP. Confirmed
+# live (2026-08-20/21): Cilium's LB-IPAM assigns each VIP to exactly one
+# Service - a second Service requesting an existing VIP on a disjoint port
+# was rejected outright ("already_allocated"), regardless of
+# CiliumLoadBalancerIPPool serviceSelector scoping. NodePort sidesteps
+# LB-IPAM/L2-announcement entirely - the DMZ-forwarder LXC
+# (infrastructure/dmz-forwarder/) reaches this via plain node IP:port
+# instead, via nftables DNAT (see that dir's nftables.nft).
+apiVersion: v1
+kind: Service
+metadata:
+  name: wireguard
+  namespace: wireguard
+spec:
+  type: NodePort
+  selector:
+    app: wireguard
+  ports:
+    - name: wireguard
+      port: 51820
+      targetPort: 51820
+      protocol: UDP
+      nodePort: 31820 # Pinned so infrastructure/dmz-forwarder/nftables.nft's DNAT rule doesn't need updating if this Service is ever recreated
