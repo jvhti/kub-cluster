@@ -1,0 +1,22 @@
+# degoog's indexer Postgres, via CloudNativePG — same pattern as
+# applications/paperless/postgres-cluster.yaml and
+# applications/immich/postgres-cluster.yaml. Single instance, no HA, homelab
+# scale. Optional per degoog's own docs (SQLite indexer works without it) but
+# used here to match the project's own "full" docker-compose example, which
+# pairs Postgres with Valkey for better concurrent indexing/full-text search.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: degoog-postgres
+  namespace: degoog
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17-bookworm
+  storage:
+    size: 10Gi
+    storageClass: longhorn
+  bootstrap:
+    initdb:
+      database: degoog
+      owner: degoog
+  enablePDB: false

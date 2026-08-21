@@ -1,0 +1,18 @@
+# degoog's data dir (settings, installed engines/plugins/themes, aliases,
+# blocklist — see the project's environment-variables docs for the full
+# data/ layout) on Longhorn. No TrueNAS export needed here, unlike
+# applications/paperless/storage.yaml's media/consume PVs — there's no bulk
+# media involved, this is all small config/state, same reasoning as
+# paperless's own `data` PVC (its Whoosh search index).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: degoog-data
+  namespace: degoog
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 5Gi

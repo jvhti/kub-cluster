@@ -1,0 +1,29 @@
+# Second oauth2-proxy instance, dedicated to degoog — NOT a shared/multi-host
+# proxy in front of both Longhorn and degoog. oauth2-proxy's --upstream flag
+# (legacy CLI config, what infrastructure/controllers/oauth2-proxy/ uses) is a
+# single global backend, no per-Host routing. The alternative — alpha-config's
+# upstreamConfig.upstreams — does support multiple upstreams, but only via
+# per-path regex matching, not per-Host: since both longhorn.jvos.dev and
+# search.jvos.dev serve requests at the same path ("/"), one shared instance
+# in that mode couldn't tell them apart. A second whole instance (same chart,
+# same pattern, different upstream/redirect-url/credentials) sidesteps the
+# limitation entirely and leaves Longhorn's working setup untouched. See
+# infrastructure/controllers/oauth2-proxy/values.yaml for the sibling
+# instance and its own comments on alpha-config's other pitfalls.
+#
+# See infrastructure/controllers/oauth2-proxy-degoog/secrets.yaml for how
+# config.existingSecret's keys get their real values.
+
+config:
+  existingSecret: oauth2-proxy-degoog-credentials
+
+extraArgs:
+  provider: oidc
+  oidc-issuer-url: https://auth.jvos.dev
+  redirect-url: https://search.jvos.dev/oauth2/callback
+  email-domain: "*"
+  cookie-domain: .jvos.dev
+  whitelist-domain: .jvos.dev
+  reverse-proxy: "true"
+  set-xauthrequest: "true"
+  upstream: http://degoog.degoog.svc.cluster.local:4444

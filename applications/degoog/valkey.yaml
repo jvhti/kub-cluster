@@ -1,0 +1,59 @@
+# Shared search-result cache for degoog (DEGOOG_VALKEY_URL) — without it,
+# caching stays per-process/in-memory only. Same plain-Deployment-+-PVC
+# pattern as applications/paperless/redis.yaml; no persistence guarantees
+# needed beyond surviving a pod restart (it's a cache, fully rebuildable).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: degoog-valkey
+  namespace: degoog
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: degoog-valkey
+  template:
+    metadata:
+      labels:
+        app: degoog-valkey
+    spec:
+      containers:
+        - name: valkey
+          image: valkey/valkey:8-alpine
+          command: ["valkey-server", "--save", "", "--appendonly", "no"]
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: degoog-valkey
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: degoog-valkey
+  namespace: degoog
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: degoog-valkey
+  namespace: degoog
+spec:
+  selector:
+    app: degoog-valkey
+  ports:
+    - port: 6379
+      targetPort: 6379

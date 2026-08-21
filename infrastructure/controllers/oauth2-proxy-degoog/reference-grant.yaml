@@ -1,0 +1,14 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-degoog-httproute
+  namespace: oauth2-proxy-degoog
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: degoog
+  to:
+    - group: ""
+      kind: Service
+      name: oauth2-proxy-degoog
