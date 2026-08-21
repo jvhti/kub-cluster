@@ -59,6 +59,8 @@ spec:
               value: 192.168.1.0/24,10.0.0.0/8
             - name: TZ
               value: America/Sao_Paulo
+            - name: HEALTH_SERVER_ADDRESS
+              value: 0.0.0.0:9999 # default is 127.0.0.1:9999 — loopback-only, unreachable by kubelet's httpGet probe, which connects to the Pod IP, not the container's own localhost
             - name: WIREGUARD_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
