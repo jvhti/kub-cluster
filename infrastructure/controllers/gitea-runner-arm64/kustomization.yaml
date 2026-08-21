@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  # - secrets.yaml  # Real values created imperatively — see that file's comments.
+
+helmCharts:
+  - name: actions
+    repo: https://dl.gitea.com/charts/
+    version: 0.1.2
+    releaseName: gitea-runner-arm64
+    namespace: gitea-runner-arm64
+    valuesFile: values.yaml
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "-1" # After gitea itself (default wave), which must be up to register against.

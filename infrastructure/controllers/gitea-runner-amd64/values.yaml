@@ -1,0 +1,44 @@
+# One of two act_runner instances — amd64 and arm64 kept as separate
+# StatefulSets (this chart is a single enabled:true/false toggle producing
+# one StatefulSet, so "two runners" means two chart installs) rather than
+# one runner handling both architectures via QEMU emulation. Real native
+# build speed on each arch, at the cost of running the chart's required
+# privileged DinD sidecar twice instead of once — accepted tradeoff for a
+# homelab CI use case (memogram and any future custom-built image).
+#
+# Pinned to kub-node-1 specifically (not kub-ctrl-1, the control-plane
+# node) — no need to put a privileged CI workload on the node that also
+# runs the API server, and kub-node-1/pi1 are both untainted regular
+# workers anyway.
+enabled: true
+
+giteaRootURL: https://gitea.jvos.dev
+
+existingSecret: gitea-runner-amd64-token
+existingSecretKey: token
+
+statefulset:
+  nodeSelector:
+    kubernetes.io/arch: amd64
+    kubernetes.io/hostname: kub-node-1
+
+  runner:
+    # Labels this runner advertises to Gitea Actions — a workflow targets
+    # this specific architecture via `runs-on: amd64`. `host` schema (not
+    # `docker://<image>`) since steps just need `docker build` against the
+    # DinD sidecar's socket directly, no isolated per-job container image
+    # required for this use case. See
+    # infrastructure/controllers/gitea-runner-arm64/values.yaml for the
+    # sibling runner's `runs-on: arm64` label — this is what lets one
+    # workflow matrix build both architectures on the right node each.
+    config: |
+      log:
+        level: info
+      runner:
+        labels:
+          - "amd64:host"
+      cache:
+        enabled: false
+      container:
+        require_docker: true
+        docker_timeout: 300s
