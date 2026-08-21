@@ -152,20 +152,6 @@ configMap:
             - 'authorization_code'
           response_types:
             - 'code'
-          # Chart default is client_secret_basic, but oauth2-proxy's OIDC
-          # provider (legacy --upstream/extraArgs mode, no flag exists to
-          # change this) always sends the client secret via
-          # client_secret_post at the token endpoint instead — confirmed
-          # live via a real login attempt against the degoog client below,
-          # which hit "invalid_client ... token_endpoint_auth_method
-          # 'client_secret_post', however the OAuth 2.0 client registration
-          # does not allow this method". This client shares the exact same
-          # oauth2-proxy chart/args shape, so it was hitting the identical
-          # failure on every login — just not noticed yet since it hadn't
-          # been logged into recently. Explicitly allowing
-          # client_secret_post here is the fix, not changing oauth2-proxy
-          # (it has no config for this).
-          token_endpoint_auth_method: 'client_secret_post'
         - client_id: 'oauth2-proxy-degoog'
           client_name: 'oauth2-proxy (degoog)'
           client_secret:
@@ -183,7 +169,21 @@ configMap:
             - 'authorization_code'
           response_types:
             - 'code'
-          token_endpoint_auth_method: 'client_secret_post' # see the oauth2-proxy client's comment above — same root cause, same fix.
+          # NOT setting token_endpoint_auth_method here, same as the
+          # oauth2-proxy (Longhorn) client above — a prior change here
+          # explicitly forced this to client_secret_post on both clients,
+          # based on a misread of an early error message (it named
+          # client_secret_post as the method Authelia's client *required*
+          # at the time, not what oauth2-proxy actually sent). That "fix"
+          # was reverted after confirming live that Longhorn's client
+          # authenticates successfully on the chart's actual default with
+          # no explicit override — degoog's real failure was an unrelated
+          # client-secret mismatch (see
+          # infrastructure/controllers/oauth2-proxy-degoog/secrets.yaml's
+          # regeneration note) plus the browser firing the OAuth callback
+          # twice for one code, which produces two different-looking
+          # errors from a single underlying cause. Leave this unset unless
+          # a real, reproduced-on-a-fresh-code failure says otherwise.
 
 ingress:
   # Top-level master switch, separate from gatewayAPI.enabled below — chart
