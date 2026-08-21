@@ -1,0 +1,56 @@
+# Kavita: single standalone Deployment, no gluetun netns needed — it only
+# serves HTTP to LAN/Gateway clients, same shape as jellyfin/jellyseerr.
+# Runs as root by default (TrueNAS's active_workloads.container_details
+# showed run_as_context uid/gid 0, and the app catalog metadata grants
+# CHOWN/SETUID/SETGID capabilities for it to manage file ownership itself)
+# — no PUID/PGID env vars, unlike the LinuxServer-style images used
+# elsewhere in this repo.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kavita
+  namespace: kavita
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # RWO Longhorn config PVC — a RollingUpdate would try to attach it to two pods at once
+  selector:
+    matchLabels:
+      app: kavita
+  template:
+    metadata:
+      labels:
+        app: kavita
+    spec:
+      containers:
+        - name: kavita
+          image: jvmilazz0/kavita:0.9.0.2
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+          ports:
+            - containerPort: 5000
+          volumeMounts:
+            - name: config
+              mountPath: /kavita/config
+            - name: media
+              mountPath: /media
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: kavita-config
+        - name: media
+          persistentVolumeClaim:
+            claimName: kavita-media
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kavita
+  namespace: kavita
+spec:
+  selector:
+    app: kavita
+  ports:
+    - port: 5000
+      targetPort: 5000

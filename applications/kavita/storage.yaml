@@ -1,0 +1,64 @@
+# Config on Longhorn (dynamically provisioned), not a static PV over the
+# old TrueNAS NFS export — Kavita keeps kavita.db (and cache.db) as WAL-mode
+# SQLite, same problem class documented in
+# docs/truenas-app-migrations.md's "Don't put a WAL-mode SQLite db on NFS"
+# section for sonarr/radarr/bazarr. Confirmed live before migrating: both
+# kavita.db-wal and cache.db-wal were non-empty/actively growing on the
+# TrueNAS bind mount, so this app was moved straight to Longhorn from the
+# start rather than repeating the arr-stack's NFS-then-corrupt-then-migrate
+# path. Data was copied across via the scratch-pod pattern (old NFS export
+# + this PVC both mounted, `cp -a`) with the TrueNAS app stopped first so
+# the WAL had a chance to be in a consistent state; the temporary NFS
+# export used only for that copy has since been deleted.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kavita-config
+  namespace: kavita
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi
+---
+# Media: bind-mounted, dataset-backed data kept in place, same static-PV
+# approach as applications/arr-stack/storage.yaml's arr-media PV — except
+# pointed at the books subdirectory specifically (matching Kavita's
+# original TrueNAS bind mount, /mnt/General/arr/media/books -> /media)
+# rather than the whole arr/media share, since Kavita only needs its own
+# library. This is a subdirectory of an already-exported dataset, not a
+# parent directory containing separate child datasets, so the "NFS
+# exports: only child datasets" caveat elsewhere in the runbook doesn't
+# apply here — confirmed live, mounts fine.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: kavita-media
+spec:
+  capacity:
+    storage: 4Ti # nominal — NFS doesn't enforce this, ZFS quota (if any) is the real limit
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: kavita-media
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: 10.0.0.5
+    path: /mnt/General/arr/media/books
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kavita-media
+  namespace: kavita
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: kavita-media
+  resources:
+    requests:
+      storage: 4Ti
+  volumeName: kavita-media
