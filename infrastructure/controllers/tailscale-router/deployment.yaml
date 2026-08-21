@@ -46,7 +46,7 @@ spec:
               value: "false" # Use the kernel WireGuard/TUN data path (needs NET_ADMIN + /dev/net/tun below) rather than userspace networking, so routes/exit-node actually forward packets
             - name: TS_EXTRA_ARGS
               value: >-
-                --login-server=https://headscale.jvos.dev:8443
+                --login-server=https://headscale.jvos.dev:443
                 --advertise-routes=192.168.1.0/24,10.42.0.0/16,10.2.0.0/16
                 --advertise-exit-node
                 --accept-routes

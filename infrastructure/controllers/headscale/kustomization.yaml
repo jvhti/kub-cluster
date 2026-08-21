@@ -12,7 +12,13 @@ resources:
   - pvc.yaml
   - deployment.yaml
   - service.yaml
-  - service-external-port.yaml
+  # service-external-port.yaml removed: was a hand-applied (never
+  # ArgoCD-managed - discovery.k8s.io EndpointSlices are excluded
+  # cluster-wide) Service+EndpointSlice pair that remapped :8443 -> :443 for
+  # in-cluster clients only. Unneeded now that server_url is plain :443
+  # (configmap.yaml) - deleted live with `kubectl delete -f
+  # service-external-port.yaml` alongside this commit, since nothing would
+  # otherwise prune it.
   - tlsroute.yaml
   # Headplane: web admin UI for Headscale (headscale.jvos.dev has no web UI
   # of its own, only API/control endpoints). Deployed into this same

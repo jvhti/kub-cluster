@@ -5,14 +5,17 @@ metadata:
   namespace: headscale
 data:
   config.yaml: |
-    # :8443 because gateway-headscale (its own dedicated Gateway - see
-    # gateway.yaml for why it can't share gateway-internal) shares the LAN's
-    # single WAN IP with gateway-internal, which already owns external
-    # port 443 - the router forwards WAN:8443 -> this Gateway's VIP:443
-    # instead. Tailscale clients handle a non-default control-server port
-    # fine.
-    server_url: https://headscale.jvos.dev:8443
-    listen_addr: 0.0.0.0:8443 # Unprivileged port - the Service (service.yaml) maps public 443 -> this
+    # Plain :443 - the DMZ-forwarder LXC (infrastructure/dmz-forwarder/)
+    # SNI-routes external :443 traffic between gateway-internal (everything
+    # else) and gateway-headscale (this) based on the TLS ClientHello's SNI,
+    # so gateway-headscale doesn't need its own external port anymore. Used
+    # to be :8443 (router "forwarded" WAN:8443 -> this Gateway's VIP:443) -
+    # dropped once the router turned out to be DMZ-only, no per-port
+    # forwarding at all, which made the old setup silently stop working for
+    # external clients entirely (confirmed live: neither :8443 nor :443
+    # reached headscale externally right before this fix).
+    server_url: https://headscale.jvos.dev:443
+    listen_addr: 0.0.0.0:8443 # Purely internal container listen port - unrelated to the external port above, the Service (service.yaml) maps public 443 -> this regardless
     metrics_listen_addr: 0.0.0.0:9090
     grpc_listen_addr: 0.0.0.0:50443
     grpc_allow_insecure: false

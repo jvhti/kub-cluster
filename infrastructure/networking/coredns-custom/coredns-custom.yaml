@@ -30,25 +30,14 @@ data:
             192.168.1.240 auth.jvos.dev
             192.168.1.240 argocd.jvos.dev
             192.168.1.240 longhorn.jvos.dev
-            # NOT gateway-headscale's VIP (192.168.1.241) directly, despite
-            # every other entry here pointing straight at a Gateway VIP.
-            # headscale's server_url uses :8443 (what EXTERNAL clients need
-            # through the router's port-forward), but the Gateway itself
-            # only ever listens on 443 - the `hosts` plugin can only rewrite
-            # the IP, not the port, so an in-cluster client resolving
-            # straight to .241 would still try (and hang) on .241:8443,
-            # which nothing listens on (confirmed live: Headplane's API-key
-            # validation and a plain curl both hung indefinitely this way).
-            # This is the ClusterIP of headscale-external-port (infra/
-            # controllers/headscale/service-external-port.yaml), a Service+
-            # EndpointSlice pair that remaps :8443 -> gateway-headscale's
-            # real :443 at the kube-proxy/Cilium layer - no proxy pod
-            # involved. ClusterIPs are stable for a Service's lifetime but
-            # not literally pinned the way LAN VIPs are; if that Service is
-            # ever deleted/recreated, update this to match its new
-            # ClusterIP (`kubectl get svc headscale-external-port -n
-            # headscale`).
-            10.43.44.194 headscale.jvos.dev
+            # gateway-headscale's own VIP directly, same as every other
+            # entry here - safe now that server_url is plain :443
+            # (headscale/configmap.yaml), matching what the Gateway itself
+            # actually listens on. Used to need a ClusterIP+EndpointSlice
+            # remap instead (headscale-external-port, now removed) because
+            # server_url was :8443 but nothing in-cluster listened on that
+            # port - see that configmap's comment for the history.
+            192.168.1.241 headscale.jvos.dev
             fallthrough
         }
         forward . /etc/resolv.conf
