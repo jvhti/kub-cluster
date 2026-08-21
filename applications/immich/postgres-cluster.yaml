@@ -1,0 +1,26 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: immich-postgres
+  namespace: immich
+spec:
+  instances: 1
+  imageName: ghcr.io/tensorchord/cloudnative-vectorchord:15-1.1.1
+  storage:
+    size: 20Gi
+    storageClass: longhorn
+  bootstrap:
+    initdb:
+      database: immich
+      owner: immich
+      postInitApplicationSQL:
+        - CREATE EXTENSION IF NOT EXISTS vchord CASCADE
+        - CREATE EXTENSION IF NOT EXISTS cube CASCADE
+        - CREATE EXTENSION IF NOT EXISTS earthdistance CASCADE
+  postgresql:
+    shared_preload_libraries:
+      - vchord.so
+  # Single instance, no HA needed for a homelab photo library — matches how
+  # every other app here (gitea's bundled postgresql-ha aside) runs without
+  # replica fan-out. Revisit if this ever needs to survive a node failure.
+  enablePDB: false

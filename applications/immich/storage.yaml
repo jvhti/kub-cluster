@@ -1,0 +1,36 @@
+# Static PV over the existing TrueNAS dataset that already held Immich's
+# photo library (General/immich/uploads, exported via a hand-added NFS share
+# on TrueNAS — see CLAUDE.md's "Things ArgoCD does NOT manage" for why
+# storage like this isn't provisioned through nfs-csi's dynamic StorageClass:
+# we want to keep using this exact directory in place, not a fresh empty
+# nfs-csi subdirectory that would need the old data copied into it.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: immich-uploads
+spec:
+  capacity:
+    storage: 1Ti # nominal — NFS doesn't enforce this, ZFS quota (if any) is the real limit
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: immich-uploads
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: 10.0.0.5
+    path: /mnt/General/immich/uploads
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: immich-uploads
+  namespace: immich
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: immich-uploads
+  resources:
+    requests:
+      storage: 1Ti
+  volumeName: immich-uploads
