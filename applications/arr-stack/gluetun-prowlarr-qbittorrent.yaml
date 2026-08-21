@@ -55,6 +55,8 @@ spec:
               value: "off"
             - name: FIREWALL_VPN_INPUT_PORTS
               value: "58387"
+            - name: FIREWALL_INPUT_PORTS
+              value: "30050,30024" # prowlarr and qbittorrent WebUI ports — gluetun's INPUT chain defaults to DROP for everything not explicitly allowed, which blocks other pods (e.g. the Gateway) from reaching sidecar containers sharing this Pod's netns unless their ports are listed here too. Confirmed live: Service/EndpointSlice/DNS all looked correct but curl against the pod IP just hung — this is the actual fix, not a routing/Service problem.
             - name: FIREWALL_OUTBOUND_SUBNETS
               value: 192.168.1.0/24,10.0.0.0/8
             - name: TZ
