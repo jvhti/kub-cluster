@@ -15,15 +15,19 @@ spec:
       labels:
         app: wireguard
     spec:
-      # Required for the WireGuard kernel module data path to actually
-      # forward packets, not just for wg-quick to come up - same pattern as
-      # tailscale-router's securityContext.sysctls (see that Deployment's
-      # comment for the confirmed-live failure mode this avoids).
+      # net.ipv4.conf.all.src_valid_mark deliberately NOT set here despite
+      # being wg-quick's usual recommendation for policy-routing setups:
+      # confirmed live this crash-loops the pod (SysctlForbidden - only
+      # net.ipv4.ip_forward and net.ipv6.conf.all.forwarding are in this
+      # k3s cluster's kubelet allowedUnsafeSysctls, added previously for
+      # tailscale-router). Not widening that allowlist cluster-wide for one
+      # Deployment; the linuxserver/wireguard entrypoint's own privileged
+      # startup (NET_ADMIN below) can set it inside its own netns if
+      # actually needed - only the Kubernetes API-level pod field is
+      # blocked here.
       securityContext:
         sysctls:
           - name: net.ipv4.ip_forward
-            value: "1"
-          - name: net.ipv4.conf.all.src_valid_mark
             value: "1"
       containers:
         - name: wireguard
