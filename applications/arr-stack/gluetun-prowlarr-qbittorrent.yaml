@@ -59,8 +59,6 @@ spec:
               value: 192.168.1.0/24,10.0.0.0/8
             - name: TZ
               value: America/Sao_Paulo
-            - name: HEALTH_SERVER_ADDRESS
-              value: 0.0.0.0:9999 # default is 127.0.0.1:9999 — loopback-only, unreachable by kubelet's httpGet probe, which connects to the Pod IP, not the container's own localhost
             - name: WIREGUARD_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
@@ -84,9 +82,19 @@ spec:
             - containerPort: 51413 # qbittorrent torrenting, udp
               protocol: UDP
           readinessProbe:
-            httpGet:
-              path: / # gluetun's built-in health server (HEALTH_SERVER_ADDRESS, default 127.0.0.1:9999) — 200 once the VPN tunnel is actually up, 500 otherwise
-              port: 9999
+            # exec, not httpGet: kubelet's httpGet probe connects from outside
+            # the Pod (source is the node's IP, arriving on eth0), but
+            # gluetun's own iptables firewall (INPUT chain policy DROP,
+            # built to lock down the VPN netns) has no ACCEPT rule for
+            # unsolicited eth0 traffic to arbitrary local ports like 9999 —
+            # confirmed live, httpGet against the Pod IP always timed out
+            # even with HEALTH_SERVER_ADDRESS=0.0.0.0:9999, while wget
+            # against 127.0.0.1:9999 from a sibling container in the same
+            # netns (loopback traffic, always ACCEPTed) worked immediately.
+            # exec runs inside the gluetun container itself, so it's
+            # loopback traffic too and bypasses the firewall entirely.
+            exec:
+              command: ["wget", "-qO-", "--timeout=3", "http://127.0.0.1:9999/"]
             initialDelaySeconds: 15
             periodSeconds: 10
         - name: prowlarr
