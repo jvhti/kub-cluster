@@ -1,0 +1,20 @@
+# paperless-ngx's Postgres, via CloudNativePG — same pattern as
+# applications/immich/postgres-cluster.yaml and
+# applications/arr-stack/jellystat-postgres.yaml. Single instance, no HA,
+# same reasoning as those: homelab scale, not worth the complexity.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: paperless-postgres
+  namespace: paperless
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17-bookworm
+  storage:
+    size: 10Gi
+    storageClass: longhorn
+  bootstrap:
+    initdb:
+      database: paperless
+      owner: paperless
+  enablePDB: false

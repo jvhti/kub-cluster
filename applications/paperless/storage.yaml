@@ -1,0 +1,95 @@
+# Documents (originals + generated PDF/A archives + thumbnails) on a new
+# TrueNAS dataset/export, same keep-bulk-data-on-TrueNAS approach as
+# applications/immich/storage.yaml's uploads PV — see
+# docs/truenas-app-migrations.md's "Adding a new export" section for how
+# this export was created (General/paperless/media, maproot_user: root).
+# This is a brand-new dataset (not a TrueNAS app migration), so there's no
+# existing data to preserve in place — a static PV is still used anyway,
+# rather than nfs-csi dynamic provisioning, so the dataset is a real
+# top-level ZFS dataset (snapshots/quotas manageable directly on TrueNAS)
+# instead of an opaque subdirectory under General/longhorn.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: paperless-media
+spec:
+  capacity:
+    storage: 500Gi # nominal — NFS doesn't enforce this, ZFS quota (if any) is the real limit
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: paperless-media
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: 10.0.0.5
+    path: /mnt/General/paperless/media
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: paperless-media
+  namespace: paperless
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: paperless-media
+  resources:
+    requests:
+      storage: 500Gi
+  volumeName: paperless-media
+---
+# Consume directory: where new documents get dropped (e.g. via a scanner
+# or synced upload folder) for paperless's consumer to pick up and file
+# away into `media`. Same dataset/export family as media, kept as its own
+# subdirectory-of-a-dataset export.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: paperless-consume
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: paperless-consume
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: 10.0.0.5
+    path: /mnt/General/paperless/consume
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: paperless-consume
+  namespace: paperless
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: paperless-consume
+  resources:
+    requests:
+      storage: 50Gi
+  volumeName: paperless-consume
+---
+# Data dir (the Whoosh full-text search index + classifier model) on
+# Longhorn, not NFS — same reasoning as docs/truenas-app-migrations.md's
+# "Don't put a WAL-mode SQLite db on NFS" section: Whoosh's index files
+# use mmap-style access patterns that don't play well with NFS locking
+# semantics either, and this is disposable/rebuildable state anyway (paperless
+# can rebuild the search index from `media` + Postgres), unlike the documents
+# themselves.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: paperless-data
+  namespace: paperless
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi
