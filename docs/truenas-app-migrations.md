@@ -2,10 +2,14 @@
 
 A runbook for moving a TrueNAS app-catalog app (Docker Compose under the
 hood, in SCALE's "Dragonfish"+ apps system) onto k3s, keeping bulk data on
-TrueNAS via NFS. Written up after doing this for Immich (see
-`applications/immich/` and its commit history for the concrete example);
-generalize from there rather than treating every detail below as gospel
-for every app.
+TrueNAS via NFS where that's actually safe to do (see the SQLite/NFS
+caveat below — not everything should stay on NFS). Written up after
+doing this for Immich (see `applications/immich/` and its commit history)
+and later the gluetun/prowlarr/qbittorrent/sonarr/radarr/bazarr *arr
+stack (see `applications/arr-stack/`, gluetun-fronted apps sharing its
+netns vs. plain standalone Deployments, and the NFS-to-Longhorn config
+fix); generalize from there rather than treating every detail below as
+gospel for every app.
 
 ## When storage should stay on TrueNAS vs. move to nfs-csi
 
@@ -27,6 +31,65 @@ to see which is which.
   dynamically provision a new subdirectory instead. Simpler manifest, but
   means copying data in by hand if there's anything worth keeping (`kubectl
   cp` or a scratch pod mounting both old and new paths with `rsync`).
+
+## Don't put a WAL-mode SQLite db on NFS
+
+Even for a bind-mounted, dataset-backed config dir you'd otherwise keep
+in place per the rule above: if the app keeps a SQLite database in
+`/config` (Sonarr/Radarr/Bazarr and most of the `*arr` family do —
+`sonarr.db`, `radarr.db`, `bazarr.db` under `/config/` or `/config/db/`),
+put that PVC on `nfs-csi`'s dynamic-provisioning sibling class or,
+better, **`longhorn`** instead — not a static PV over the NFS export,
+even though the export works fine for every other app's config in this
+repo (prowlarr, qbittorrent, immich's upload dir, etc).
+
+Why: those apps run SQLite in WAL mode, which needs real mmap + byte-range
+file locking — NFS doesn't reliably provide either. Confirmed live
+migrating sonarr/radarr/bazarr (see `applications/arr-stack/`): within
+minutes of going live on NFS-backed config, `radarr.db`'s header was
+found zeroed out (unrecoverable — restored from the app's own
+`Backups/scheduled/*.zip`, see below) and `sonarr.db` intermittently threw
+`disk I/O error` / `file is not a database` under normal use (logging in
+via the UI was enough to trigger it). `PRAGMA integrity_check` on the
+live NFS-mounted file can *pass* one moment and the header can be zeroed
+the next — don't treat one clean check as proof the file is safe to keep
+running on NFS.
+
+The fix is `storageClassName: longhorn` (dynamic provisioning, no static
+PV/export needed) for just the config PVC, keeping any bulk media/data
+mount on NFS as before — media is plain file I/O, not a database, so it
+doesn't hit this problem. See `applications/arr-stack/storage.yaml`'s
+sonarr/radarr/bazarr PVCs for the concrete pattern, and its
+`sonarr-radarr-bazarr.yaml` Deployments for why `strategy.type: Recreate`
+still matters even on Longhorn (a RWO volume can't attach to two pods at
+once during a RollingUpdate either).
+
+Migrating an already-broken NFS-backed config to Longhorn: scale the
+Deployment to 0 first (**commit the `replicas: 0` change and push it** —
+a live `kubectl scale` gets reverted by ArgoCD's `selfHeal` on its next
+sync, see CLAUDE.md), then use a scratch pod that mounts both the old NFS
+export and the new PVC to copy data across (see the scratch-pod pattern
+below) — run it as root (or match the image's actual non-root default
+user explicitly via `runAsUser: 0`; some images like `keinos/sqlite3`
+default to a non-root user even when the Pod's `securityContext` is
+omitted) so it can read the NFS side, `chown -R` the target back to the
+app's real uid/gid (580 in this repo's convention) afterward, then
+restore `replicas: 1` the same committed way.
+
+## Scheduled backup zips as a recovery source
+
+Sonarr/Radarr/Bazarr (and likely the rest of the `*arr` family) keep
+their own periodic backups as zip files under
+`<config>/Backups/scheduled/*.zip` (each containing `config.xml`,
+`<app>.db`, and an `INFO` file) — a few days' worth by default,
+independent of anything TrueNAS or this repo manages. Confirmed live:
+when `radarr.db` was found corrupted (see above), the most recent
+scheduled backup was less than a day old and restored cleanly
+(`PRAGMA integrity_check: ok`, correct row count). Worth checking for
+before assuming a corrupted `*arr` database means starting the library
+over — extract with `unzip`, verify with `sqlite3 <app>.db "PRAGMA
+integrity_check;"` before trusting it, then swap it in for the live
+`.db` (removing any stale `.db-wal`/`.db-shm` siblings alongside it too).
 
 ## NFS exports: only child datasets, not parent directories
 
@@ -281,7 +344,14 @@ rather than guessing endpoint shapes) — e.g.
 `GET /api/v2.0/app/id/<name>` for full app state and container details,
 `POST /api/v2.0/app/stop` / `/app/start` / `/app/redeploy` (job-based,
 poll `GET /api/v2.0/core/get_jobs?id=<id>` for completion) for lifecycle
-actions. There is deliberately no plain container-log REST endpoint —
+actions. These lifecycle endpoints take the app name as a **bare JSON
+string body** (`-d '"radarr"'`), not `{"app_name": "radarr"}` — the
+latter fails with `[EINVAL] app_name: Input should be a valid string`;
+check `components.schemas.app_stop` (etc.) in the openapi doc if a
+request body shape isn't obvious from the endpoint name alone, rather
+than guessing. `get_jobs?id=<id>` also only accepts one `id` per call —
+`?id=<a>&id=<b>` silently returns nothing, so poll each job separately.
+There is deliberately no plain container-log REST endpoint —
 logs are websocket-only in this API version; use the `core.download`
 job-wrapper trick above for any log file instead of trying to find a
 websocket client for a one-off read.
@@ -315,3 +385,29 @@ and its follow-up commit for the concrete example:
    the reference copy / live-Secret convention). Update that directory's
    README record table to match afterward — it's the only place this
    list is tracked.
+
+## Inter-app config: other apps may still reference the old address/port
+
+If the migrated app is one that other apps talk to directly (not through
+a browser/HTTPRoute — e.g. Prowlarr's Settings → Apps connections to
+Sonarr/Radarr, or Sonarr/Radarr's own download-client entries for
+qbittorrent), migrating just that one app isn't enough — every *other*
+app's stored connection to it still points at whatever
+host:port it used to be reachable at on TrueNAS, which usually differs
+from its new in-cluster Service. Confirmed live: Prowlarr kept trying
+`radarr:30025` (TrueNAS's custom host-mapped port for Radarr) after
+Radarr moved into the cluster, failing with "Host is unreachable",
+because the in-cluster `radarr` Service actually listens on `7878` (the
+image's default port — this repo doesn't generally preserve TrueNAS's
+custom port numbers when migrating an app, see
+`applications/arr-stack/sonarr-radarr-bazarr.yaml`'s port choices).
+
+This is invisible from the newly-migrated app's own side — it comes up
+fine, its own HTTPRoute/DNS work — the failure only shows up when you
+exercise the *other* app's "Test connection" against it. After migrating
+any app that others talk to directly, check every other in-cluster app's
+own settings UI for a stale reference to it (old TrueNAS
+hostname/IP/port) and update to `<service-name>:<in-cluster-port>`
+instead — this is a manual per-app UI/config fix, not something the
+cluster migration itself can carry over, since that config lives inside
+each app's own database, not in this repo.
