@@ -8,3 +8,26 @@ persistence:
   accessModes:
     - ReadWriteOnce
   size: 10Gi
+
+gitea:
+  config:
+    service:
+      # Closed off after creating the one real (admin) account by hand —
+      # single-user homelab instance, no self-registration needed. Existing
+      # accounts/sessions are unaffected; this only blocks new signups.
+      DISABLE_REGISTRATION: true
+    actions:
+      # Powers the container registry build pipeline (memogram, and any
+      # future custom-built image) — see
+      # infrastructure/controllers/gitea-runner-amd64/ and
+      # -arm64/ for the two act_runner instances (one per node
+      # architecture) that actually execute workflow runs registered
+      # against this instance.
+      ENABLED: true
+    ssh.minimum_key_sizes:
+      # Chart/Gitea default (3071) rejected a real 2048-bit RSA public key
+      # on first SSH-key add attempt ("key length is not enough: got 2048,
+      # needs 3071"). Lowered to 2048 rather than disabling the check
+      # entirely (-1) — still a real minimum, just matches what's
+      # actually in use rather than turning validation off altogether.
+      RSA: 2048

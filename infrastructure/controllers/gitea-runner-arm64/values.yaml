@@ -1,0 +1,29 @@
+# Sibling of infrastructure/controllers/gitea-runner-amd64/ — see that
+# directory's values.yaml for the full reasoning on two separate runner
+# instances instead of one. Pinned to pi1, the cluster's one arm64 node.
+enabled: true
+
+giteaRootURL: https://gitea.jvos.dev
+
+existingSecret: gitea-runner-arm64-token
+existingSecretKey: token
+
+statefulset:
+  nodeSelector:
+    kubernetes.io/arch: arm64
+    kubernetes.io/hostname: pi1
+
+  runner:
+    # See gitea-runner-amd64/values.yaml's comment — same reasoning,
+    # `runs-on: arm64` routes a workflow matrix job here specifically.
+    config: |
+      log:
+        level: info
+      runner:
+        labels:
+          - "arm64:host"
+      cache:
+        enabled: false
+      container:
+        require_docker: true
+        docker_timeout: 300s

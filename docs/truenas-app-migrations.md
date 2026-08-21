@@ -132,11 +132,27 @@ curl -s -k -X POST -H "Authorization: Bearer $KEY" -H 'Content-Type: application
 }' 'https://10.0.0.5/api/v2.0/sharing/nfs'
 ```
 
-`maproot_user: root` matches the existing `General/longhorn` and
-`General/pi` shares. If the export is only needed temporarily (e.g. to
-reach a database's raw data files for a one-time dump, not for the app's
-ongoing storage), delete it again afterward:
-`DELETE /api/v2.0/sharing/nfs/id/<id>`.
+`maproot_user: root` matches the existing `General/pi` share. If the
+export is only needed temporarily (e.g. to reach a database's raw data
+files for a one-time dump, not for the app's ongoing storage), delete it
+again afterward: `DELETE /api/v2.0/sharing/nfs/id/<id>`.
+
+**Missing `maproot_user`/`maproot_group` silently breaks the `nfs-csi`
+dynamic StorageClass specifically.** Confirmed live: `General/longhorn` (the
+export backing `infrastructure/storage/csi-driver-nfs`'s `nfs-csi`
+StorageClass — used for dynamic provisioning, not a static PV like every
+export elsewhere in this doc) had somehow ended up with both fields blank.
+Any PVC using `storageClassName: nfs-csi` got stuck `Pending` forever with
+`failed to make subdirectory: ... permission denied` — NFS root-squash was
+mapping the CSI provisioner's root-owned `mkdir` to `nobody`, which has no
+write access to the dataset. This went unnoticed for 4+ days on a real
+deploy (Gitea's `gitea-shared-storage` PVC) because nothing else alerts on
+a stuck PVC. If a `nfs-csi`-backed PVC won't bind, check this export's
+`maproot_user`/`maproot_group` first via `GET /api/v2.0/sharing/nfs`
+before assuming the problem is the PVC/StorageClass spec itself — and
+after fixing the export, `kubectl rollout restart
+deployment/csi-nfs-controller -n csi-driver-nfs` to force an immediate
+retry rather than waiting out the provisioner's accumulated backoff.
 
 ### Scratch-pod pattern for inspecting/mounting an export
 
