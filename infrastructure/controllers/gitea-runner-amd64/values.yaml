@@ -18,8 +18,14 @@ existingSecret: gitea-runner-amd64-token
 existingSecretKey: token
 
 statefulset:
+  # Only kubernetes.io/hostname here, not also kubernetes.io/arch — the
+  # chart's statefulset.yaml template emits nodeSelector as a separate
+  # `nodeSelector: {...}` block per top-level key instead of merging them
+  # into one map, so a second key produces an invalid manifest ("mapping
+  # key \"nodeSelector\" already defined", confirmed via `helm template`
+  # against chart version 0.1.2). Pinning to kub-node-1 by hostname alone
+  # is sufficient anyway — it's definitionally the amd64 node.
   nodeSelector:
-    kubernetes.io/arch: amd64
     kubernetes.io/hostname: kub-node-1
 
   runner:

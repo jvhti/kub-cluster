@@ -9,8 +9,11 @@ existingSecret: gitea-runner-arm64-token
 existingSecretKey: token
 
 statefulset:
+  # Only kubernetes.io/hostname here — see
+  # infrastructure/controllers/gitea-runner-amd64/values.yaml's comment for
+  # why a second nodeSelector key breaks this chart's template. pi1 is the
+  # cluster's one arm64 node, so hostname alone is enough to pin correctly.
   nodeSelector:
-    kubernetes.io/arch: arm64
     kubernetes.io/hostname: pi1
 
   runner:
