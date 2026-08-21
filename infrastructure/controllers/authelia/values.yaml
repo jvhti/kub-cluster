@@ -41,6 +41,12 @@ pod:
         items:
           - key: client-secret-hash
             path: client-secret-hash.txt
+    - name: oidc-client-secret-memos
+      secret:
+        secretName: authelia-oidc-client-memos
+        items:
+          - key: client-secret-hash
+            path: client-secret-hash.txt
   extraVolumeMounts:
     - name: users-database
       mountPath: /config/users_database.yml
@@ -56,6 +62,10 @@ pod:
       readOnly: true
     - name: oidc-client-secret-degoog
       mountPath: /secrets/client-secret-hash-degoog.txt
+      subPath: client-secret-hash.txt
+      readOnly: true
+    - name: oidc-client-secret-memos
+      mountPath: /secrets/client-secret-hash-memos.txt
       subPath: client-secret-hash.txt
       readOnly: true
 
@@ -184,6 +194,25 @@ configMap:
           # twice for one code, which produces two different-looking
           # errors from a single underlying cause. Leave this unset unless
           # a real, reproduced-on-a-fresh-code failure says otherwise.
+        - client_id: 'oauth2-proxy-memos'
+          client_name: 'oauth2-proxy (memos)'
+          client_secret:
+            path: '/secrets/client-secret-hash-memos.txt'
+          public: false
+          authorization_policy: 'one_factor'
+          redirect_uris:
+            - 'https://memos.jvos.dev/oauth2/callback'
+          scopes:
+            - 'openid'
+            - 'profile'
+            - 'email'
+            - 'groups'
+          grant_types:
+            - 'authorization_code'
+          response_types:
+            - 'code'
+          # NOT setting token_endpoint_auth_method — see Learning #1 in
+          # docs/oauth2-proxy-authelia.md.
 
 ingress:
   # Top-level master switch, separate from gatewayAPI.enabled below — chart

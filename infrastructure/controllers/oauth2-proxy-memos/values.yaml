@@ -1,0 +1,23 @@
+# Third oauth2-proxy instance, dedicated to memos — same reasoning as
+# infrastructure/controllers/oauth2-proxy-degoog/values.yaml (one instance
+# per app; the legacy CLI-flag config is single-upstream/single-redirect-url,
+# and alpha-config's per-path routing can't tell two Host-identical "/" apps
+# apart). See docs/oauth2-proxy-authelia.md for the full runbook this
+# instance followed.
+#
+# See infrastructure/controllers/oauth2-proxy-memos/secrets.yaml for how
+# config.existingSecret's keys get their real values.
+
+config:
+  existingSecret: oauth2-proxy-memos-credentials
+
+extraArgs:
+  provider: oidc
+  oidc-issuer-url: https://auth.jvos.dev
+  redirect-url: https://memos.jvos.dev/oauth2/callback
+  email-domain: "*"
+  cookie-domain: .jvos.dev
+  whitelist-domain: .jvos.dev
+  reverse-proxy: "true"
+  set-xauthrequest: "true"
+  upstream: http://memos.memos.svc.cluster.local:5230
