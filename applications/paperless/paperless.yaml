@@ -21,12 +21,25 @@ spec:
       labels:
         app: paperless
     spec:
+      # Kubernetes auto-injects a <SVCNAME>_PORT env var for every Service
+      # visible to the pod, using the legacy Docker-links convention — and
+      # since the Service here is also named "paperless", that becomes
+      # PAPERLESS_PORT=tcp://<clusterIP>:8000. paperless-ngx's own granian
+      # startup script reads PAPERLESS_PORT directly as its --port flag,
+      # so the two collided and granian refused to start ("not a valid
+      # integer"). Confirmed live. Disabling service-links avoids this
+      # whole class of collision for any other PAPERLESS_* var a future
+      # same-named Service might introduce, on top of the explicit
+      # PAPERLESS_PORT override below.
+      enableServiceLinks: false
       containers:
         - name: paperless
           image: ghcr.io/paperless-ngx/paperless-ngx:2.15
           env:
             - name: TZ
               value: America/Sao_Paulo
+            - name: PAPERLESS_PORT
+              value: "8000"
             - name: PAPERLESS_URL
               value: https://paperless.jvos.dev
             - name: PAPERLESS_TIME_ZONE
