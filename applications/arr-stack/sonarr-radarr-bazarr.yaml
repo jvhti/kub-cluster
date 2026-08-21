@@ -12,7 +12,7 @@ metadata:
   name: sonarr
   namespace: arr
 spec:
-  replicas: 1
+  replicas: 0 # TEMP: scaled down for NFS->Longhorn config migration, see storage.yaml
   strategy:
     type: Recreate # single pod on a shared NFS config dir — avoid two pods racing to use it
   selector:
@@ -67,7 +67,7 @@ metadata:
   name: radarr
   namespace: arr
 spec:
-  replicas: 1
+  replicas: 0 # TEMP: scaled down for NFS->Longhorn config migration, see storage.yaml
   strategy:
     type: Recreate
   selector:
@@ -122,7 +122,7 @@ metadata:
   name: bazarr
   namespace: arr
 spec:
-  replicas: 1
+  replicas: 0 # TEMP: scaled down for NFS->Longhorn config migration, see storage.yaml
   strategy:
     type: Recreate
   selector:
