@@ -75,17 +75,30 @@ spec:
               mountPath: /usr/src/paperless/media
             - name: consume
               mountPath: /usr/src/paperless/consume
+          # Generous startup allowance: the entrypoint runs the full Django
+          # migration history (every paperless-ngx release back to its
+          # first) before the web server binds to :8000 at all. Confirmed
+          # live: a from-scratch DB took several minutes of migrations
+          # alone, well past a 60s liveness initialDelaySeconds — that
+          # killed the container mid-migration and looped it forever. A
+          # startupProbe (generous failureThreshold, not counted against
+          # liveness until it passes once) is the right tool here rather
+          # than just stretching liveness's own delay.
+          startupProbe:
+            httpGet:
+              path: /
+              port: 8000
+            failureThreshold: 60
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /
               port: 8000
-            initialDelaySeconds: 15
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /
               port: 8000
-            initialDelaySeconds: 60
             periodSeconds: 20
       volumes:
         - name: data
