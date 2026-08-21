@@ -1,0 +1,45 @@
+config_version: 2
+name: haproxy-lxc
+mode: single
+status: ""
+dataplaneapi:
+  # Loopback-only: this API manages the DMZ-facing forwarder itself and
+  # must never be reachable from the LAN or (obviously) the internet.
+  # Manage it via SSH port-forward / SSH session on this box, not
+  # directly over the network.
+  host: 127.0.0.1
+  port: 8080
+  advertised:
+    api_address: ""
+    api_port: 0
+  scheme:
+  - http
+  transaction:
+    transaction_dir: /tmp/haproxy
+  user:
+  - name: admin
+    insecure: false
+    # Real password hash lives only on the box, not in git.
+    # Generate with: htpasswd -nbB admin '<password>'
+    # (Alpine's own mkpasswd/BusyBox has no bcrypt option - apache2-utils'
+    # htpasswd does.)
+    password: "<bcrypt-hash-here>"
+haproxy:
+  config_file: /etc/haproxy/haproxy.cfg
+  haproxy_bin: /usr/sbin/haproxy
+  reload:
+    reload_delay: 5
+    reload_cmd: service haproxy reload
+    restart_cmd: service haproxy restart
+    reload_strategy: custom
+log_targets:
+- log_to: file
+  log_file: /var/log/dataplaneapi/app.log
+  log_level: info
+  log_types:
+  - app
+- log_to: file
+  log_file: /var/log/dataplaneapi/access.log
+  log_level: info
+  log_types:
+  - access

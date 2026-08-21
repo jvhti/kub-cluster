@@ -1,0 +1,28 @@
+#!/usr/sbin/nft -f
+# DMZ-facing UDP forwarding for this box (192.168.1.239).
+#
+# HAProxy (haproxy.cfg) handles TCP 80/443 -> the Cilium Gateway VIP.
+# HAProxy has no general raw-UDP relay capability, so UDP forwards
+# (currently just WireGuard) are done here instead via kernel DNAT.
+#
+# WireGuard entry is a STUB: 10.1.0.2:31820 does not exist yet - update
+# once the in-cluster WireGuard Service's real NodePort is known.
+
+flush ruleset
+
+table ip nat {
+	chain prerouting {
+		type nat hook prerouting priority dstnat; policy accept;
+
+		# WireGuard: UDP 51820 -> k3s NodePort stub (kub-ctrl-1)
+		udp dport 51820 dnat to 10.1.0.2:31820
+	}
+
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+
+		# Masquerade so return traffic routes back through this box
+		# rather than trying to go directly node -> original client.
+		udp dport 31820 ip daddr 10.1.0.2 masquerade
+	}
+}
