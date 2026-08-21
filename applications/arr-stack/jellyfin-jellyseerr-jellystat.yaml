@@ -1,0 +1,172 @@
+# Jellyfin (media server), Jellyseerr (request UI in front of it), and
+# Jellystat (watch-history stats) — three more standalone Deployments in
+# the arr namespace, same shape as sonarr/radarr/bazarr: no gluetun netns
+# needed, they only serve HTTP to LAN/Gateway clients and talk to each
+# other over plain in-cluster Service DNS.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jellyfin
+  namespace: arr
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # RWX NFS config, but still a single logical instance — avoid two pods fighting over it during a rollout
+  selector:
+    matchLabels:
+      app: jellyfin
+  template:
+    metadata:
+      labels:
+        app: jellyfin
+    spec:
+      containers:
+        - name: jellyfin
+          image: jellyfin/jellyfin:10.11.11
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+          ports:
+            - containerPort: 8096
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: media
+              mountPath: /data
+            - name: cache
+              mountPath: /cache
+          # TrueNAS ran cache/transcodes as ix-volumes — pure scratch space,
+          # nothing worth preserving across restarts (see storage.yaml).
+          # No GPU/device passthrough yet — software transcoding only for
+          # now; revisit if hardware transcoding is needed later.
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: arr-jellyfin-config
+        - name: media
+          persistentVolumeClaim:
+            claimName: arr-media
+        - name: cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jellyfin
+  namespace: arr
+spec:
+  selector:
+    app: jellyfin
+  ports:
+    - port: 8096
+      targetPort: 8096
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jellyseerr
+  namespace: arr
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: jellyseerr
+  template:
+    metadata:
+      labels:
+        app: jellyseerr
+    spec:
+      containers:
+        - name: jellyseerr
+          image: fallenbagel/jellyseerr:2.7.3
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: PORT
+              value: "5055"
+          ports:
+            - containerPort: 5055
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: arr-jellyseerr-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jellyseerr
+  namespace: arr
+spec:
+  selector:
+    app: jellyseerr
+  ports:
+    - port: 5055
+      targetPort: 5055
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jellystat
+  namespace: arr
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: jellystat
+  template:
+    metadata:
+      labels:
+        app: jellystat
+    spec:
+      containers:
+        - name: jellystat
+          image: cyfershepard/jellystat:1.1.11
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: jellystat-secrets
+                  key: JWT_SECRET
+            - name: POSTGRES_USER
+              value: jellystat
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: jellystat-postgres-app
+                  key: password
+            - name: POSTGRES_IP
+              value: jellystat-postgres-rw
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: jellystat
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: backup
+              mountPath: /app/backend/backup-data
+      volumes:
+        - name: backup
+          persistentVolumeClaim:
+            claimName: arr-jellystat-backup
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jellystat
+  namespace: arr
+spec:
+  selector:
+    app: jellystat
+  ports:
+    - port: 3000
+      targetPort: 3000

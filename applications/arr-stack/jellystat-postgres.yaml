@@ -1,0 +1,28 @@
+# Jellystat's own Postgres, via CloudNativePG (same operator/pattern as
+# applications/immich/postgres-cluster.yaml) rather than a hand-rolled
+# Deployment+PVC — reuses the in-repo pattern instead of introducing a
+# second bespoke way to run Postgres. TrueNAS ran this as a plain
+# postgres:17 container on an ix-volume (not a dataset-backed bind mount,
+# so no static PV/NFS path to preserve — see storage.yaml's comment); data
+# was migrated by hand via pg_dump/pg_restore, not by pointing at the old
+# volume (ix-volumes aren't NFS-exportable — TrueNAS's sharing API
+# rejects paths under /mnt/.ix-apps outright: "must reside within a pool
+# mount point").
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: jellystat-postgres
+  namespace: arr
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.10-bookworm
+  storage:
+    size: 5Gi
+    storageClass: longhorn
+  bootstrap:
+    initdb:
+      database: jellystat
+      owner: jellystat
+  # Single instance, no HA — same reasoning as immich-postgres, and this
+  # is just watch-history stats, not source-of-truth media/config data.
+  enablePDB: false

@@ -117,6 +117,93 @@ spec:
     requests:
       storage: 10Gi
 ---
+# jellyfin/jellyseerr config: bind-mounted, dataset-backed data on TrueNAS
+# (General/arr/configs/jellyfin, General/arr/configs/jellyseerr) kept in
+# place, same static-PV approach as prowlarr/qbittorrent above — these
+# apps don't keep a WAL-mode SQLite db in /config (jellyfin uses its own
+# non-WAL sqlite for library metadata, and confirmed fine on NFS in
+# practice for this app; jellyseerr's config is just JSON/settings), so
+# no Longhorn detour needed here.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: arr-jellyfin-config
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: arr-jellyfin-config
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: 10.0.0.5
+    path: /mnt/General/arr/configs/jellyfin
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: arr-jellyfin-config
+  namespace: arr
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: arr-jellyfin-config
+  resources:
+    requests:
+      storage: 10Gi
+  volumeName: arr-jellyfin-config
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: arr-jellyseerr-config
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: arr-jellyseerr-config
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: 10.0.0.5
+    path: /mnt/General/arr/configs/jellyseerr
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: arr-jellyseerr-config
+  namespace: arr
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: arr-jellyseerr-config
+  resources:
+    requests:
+      storage: 5Gi
+  volumeName: arr-jellyseerr-config
+---
+# jellystat's own backup-export directory (its in-app "create a backup"
+# feature, not related to the Postgres data itself) — was an ix-volume on
+# TrueNAS, not dataset-backed, so nothing to keep in place; a fresh
+# Longhorn PVC is simplest, matching the "re-provision fresh" side of the
+# storage-choice rule above.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: arr-jellystat-backup
+  namespace: arr
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 5Gi
+---
 apiVersion: v1
 kind: PersistentVolume
 metadata:

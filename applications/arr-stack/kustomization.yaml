@@ -8,4 +8,6 @@ resources:
   - storage.yaml
   - gluetun-prowlarr-qbittorrent.yaml
   - sonarr-radarr-bazarr.yaml
+  - jellystat-postgres.yaml
+  - jellyfin-jellyseerr-jellystat.yaml
   - httproute.yaml

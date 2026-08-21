@@ -49,6 +49,9 @@ data:
             192.168.1.240 sonarr.jvos.dev
             192.168.1.240 radarr.jvos.dev
             192.168.1.240 bazarr.jvos.dev
+            192.168.1.240 jellyfin.jvos.dev
+            192.168.1.240 jellyseerr.jvos.dev
+            192.168.1.240 jellystat.jvos.dev
             fallthrough
         }
         forward . /etc/resolv.conf
