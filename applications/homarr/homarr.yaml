@@ -48,6 +48,20 @@ spec:
                 secretKeyRef:
                   name: homarr-secrets
                   key: secret-encryption-key
+            # Required by Auth.js (NextAuth) itself to encrypt the OIDC
+            # login flow's JWE-encrypted state/session cookies — separate
+            # from SECRET_ENCRYPTION_KEY above (that one only encrypts
+            # integration secrets Homarr stores in its own db). Missing
+            # this was the actual root cause of a real
+            # "?error=Configuration" / OAuthProfileParseError /
+            # ERR_JWE_DECRYPTION_FAILED loop on first deploy — confirmed
+            # against homarr-labs/homarr's own .env.example, which flags
+            # AUTH_SECRET as required for Auth.js regardless of provider.
+            - name: AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: homarr-secrets
+                  key: auth-secret
             - name: AUTH_OIDC_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
