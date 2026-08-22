@@ -46,6 +46,12 @@ spec:
               value: immich-redis
             - name: UPLOAD_LOCATION
               value: /data
+            # fotos.jvos.dev is internet-reachable via the DMZ-forwarder
+            # (gateway-internal) with no auth gate — don't let anonymous
+            # visitors register accounts. Existing accounts still log in
+            # normally; new users need an admin-created account.
+            - name: IMMICH_DISABLE_SIGNUP
+              value: "true"
             # No machine-learning service deployed yet — smart search/face
             # recognition stay off until that's added. The server itself
             # doesn't hard-require ML at boot; it's toggled in Admin Settings.
