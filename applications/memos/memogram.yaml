@@ -35,6 +35,15 @@ spec:
       # is created (docker-registry type, same admin PAT as gitea-admin-pat).
       imagePullSecrets:
         - name: gitea-registry-pull
+      # memogram's image is built FROM cgr.dev/chainguard/static:latest-glibc
+      # (see memogram-build's Dockerfile), which runs as uid/gid 65532
+      # (Chainguard's standard "nonroot" user) by default — confirmed live,
+      # the container panicked with "permission denied" writing DATA
+      # (/data/data.txt) against the Longhorn PVC's default root-owned mount
+      # until fsGroup was set here so the volume mounts group-writable by
+      # that uid.
+      securityContext:
+        fsGroup: 65532
       containers:
         - name: memogram
           image: gitea.jvos.dev/jvhti/memogram:latest
