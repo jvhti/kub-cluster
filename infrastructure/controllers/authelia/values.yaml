@@ -80,6 +80,18 @@ pod:
         items:
           - key: client-secret-hash
             path: client-secret-hash.txt
+    - name: oidc-client-secret-prometheus
+      secret:
+        secretName: authelia-oidc-client-prometheus
+        items:
+          - key: client-secret-hash
+            path: client-secret-hash.txt
+    - name: oidc-client-secret-alertmanager
+      secret:
+        secretName: authelia-oidc-client-alertmanager
+        items:
+          - key: client-secret-hash
+            path: client-secret-hash.txt
   extraVolumeMounts:
     - name: users-database
       mountPath: /config/users_database.yml
@@ -107,6 +119,14 @@ pod:
       readOnly: true
     - name: oidc-client-secret-openwebui
       mountPath: /secrets/client-secret-hash-openwebui.txt
+      subPath: client-secret-hash.txt
+      readOnly: true
+    - name: oidc-client-secret-prometheus
+      mountPath: /secrets/client-secret-hash-prometheus.txt
+      subPath: client-secret-hash.txt
+      readOnly: true
+    - name: oidc-client-secret-alertmanager
+      mountPath: /secrets/client-secret-hash-alertmanager.txt
       subPath: client-secret-hash.txt
       readOnly: true
 
@@ -292,6 +312,44 @@ configMap:
             # oauth2-proxy's /oauth2/callback used by every other client
             # here.
             - 'https://chat.jvos.dev/oauth/oidc/callback'
+          scopes:
+            - 'openid'
+            - 'profile'
+            - 'email'
+            - 'groups'
+          grant_types:
+            - 'authorization_code'
+          response_types:
+            - 'code'
+          # NOT setting token_endpoint_auth_method — see Learning #1 in
+          # docs/oauth2-proxy-authelia.md.
+        - client_id: 'oauth2-proxy-prometheus'
+          client_name: 'oauth2-proxy (Prometheus)'
+          client_secret:
+            path: '/secrets/client-secret-hash-prometheus.txt'
+          public: false
+          authorization_policy: 'one_factor'
+          redirect_uris:
+            - 'https://prometheus.jvos.dev/oauth2/callback'
+          scopes:
+            - 'openid'
+            - 'profile'
+            - 'email'
+            - 'groups'
+          grant_types:
+            - 'authorization_code'
+          response_types:
+            - 'code'
+          # NOT setting token_endpoint_auth_method — see Learning #1 in
+          # docs/oauth2-proxy-authelia.md.
+        - client_id: 'oauth2-proxy-alertmanager'
+          client_name: 'oauth2-proxy (Alertmanager)'
+          client_secret:
+            path: '/secrets/client-secret-hash-alertmanager.txt'
+          public: false
+          authorization_policy: 'one_factor'
+          redirect_uris:
+            - 'https://alertmanager.jvos.dev/oauth2/callback'
           scopes:
             - 'openid'
             - 'profile'

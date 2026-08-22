@@ -16,5 +16,14 @@ spec:
         type: PathPrefix
         value: /
     backendRefs:
-    - name: prometheus-kube-prometheus-stack-alertmanager
-      port: 9093
+    # Routes through the Alertmanager-dedicated oauth2-proxy instance instead
+    # of straight to the alertmanager Service, so public access is
+    # Authelia-gated. Only traffic via this public hostname is gated —
+    # in-cluster consumers reach Alertmanager over the Service DNS name and
+    # bypass the gateway and the proxy entirely. Needs the ReferenceGrant in
+    # infrastructure/controllers/oauth2-proxy-alertmanager/ (cross-namespace
+    # backendRef).
+    - name: oauth2-proxy-alertmanager
+      namespace: oauth2-proxy-alertmanager
+      port: 80
+      weight: 1

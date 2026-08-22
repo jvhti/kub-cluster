@@ -16,5 +16,15 @@ spec:
         type: PathPrefix
         value: /
     backendRefs:
-    - name: prometheus-operated
-      port: 9090
+    # Routes through the Prometheus-dedicated oauth2-proxy instance instead
+    # of straight to the prometheus-operated Service, so public access is
+    # Authelia-gated. Only traffic via this public hostname is gated —
+    # in-cluster consumers (e.g. Grafana's datasource) reach Prometheus over
+    # the Service DNS name (prometheus-operated.kube-prometheus-stack.svc:9090)
+    # and bypass the gateway and the proxy entirely. Needs the ReferenceGrant
+    # in infrastructure/controllers/oauth2-proxy-prometheus/ (cross-namespace
+    # backendRef).
+    - name: oauth2-proxy-prometheus
+      namespace: oauth2-proxy-prometheus
+      port: 80
+      weight: 1
