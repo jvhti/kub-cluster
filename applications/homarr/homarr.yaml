@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
         - name: homarr
-          image: ghcr.io/homarr-labs/homarr:1.76.0
+          image: ghcr.io/homarr-labs/homarr:v1.76.0
           env:
             - name: TZ
               value: America/Sao_Paulo
