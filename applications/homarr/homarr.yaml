@@ -33,24 +33,25 @@ spec:
           env:
             - name: TZ
               value: America/Sao_Paulo
-            # "credentials" kept alongside oidc permanently, not just for
-            # bootstrap — two reasons: (1) OIDC-only has no path to an
-            # initial Administrator permission at all. Homarr's own docs
-            # say the *first user created through the credentials
-            # onboarding wizard* is auto-placed in a generated
-            # "credentials-admin" group with full Administrator
-            # permission — OIDC users are never auto-granted admin, they
-            # only sync into a same-named Homarr group if one already
-            # exists with permissions assigned (see Permission System in
-            # homarr's single-sign-on docs) — so going OIDC-only left
-            # every login as a zero-permission user with literally no UI
-            # path to create that first group. (2) a local fallback login
-            # if Authelia/OIDC itself is ever down or misconfigured again
-            # (as it was during initial setup — see AUTH_OIDC_FORCE_USERINFO
-            # below). Deliberate tradeoff: a second exposed login form,
-            # accepted for the safety net.
+            # OIDC-only, by choice: back to oidc-only now that bootstrap is
+            # done. "credentials" was enabled temporarily to solve a real
+            # chicken-and-egg — OIDC-only has no path to an initial
+            # Administrator permission at all (only the first user created
+            # through the credentials onboarding wizard is auto-placed in a
+            # generated "credentials-admin" group with full Administrator
+            # permission; OIDC users only sync into a same-named Homarr
+            # group if one already exists with permissions assigned — see
+            # Permission System in homarr's single-sign-on docs). That
+            # bootstrap is done: an "admins" group with the admin
+            # permission was created directly in Homarr's db (matching
+            # Authelia's groups claim), and the OIDC user is now a member
+            # of it. Deliberately dropping the local-login fallback this
+            # unlocked — if Authelia/OIDC ever breaks again, Homarr becomes
+            # inaccessible until it's fixed, same tradeoff every other
+            # OIDC-only client in this repo (degoog, memos' oauth2-proxy,
+            # etc.) already accepts.
             - name: AUTH_PROVIDERS
-              value: "credentials,oidc"
+              value: oidc
             - name: AUTH_OIDC_ISSUER
               value: https://auth.jvos.dev
             - name: AUTH_OIDC_CLIENT_ID
