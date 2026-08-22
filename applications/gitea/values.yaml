@@ -9,6 +9,39 @@ persistence:
     - ReadWriteOnce
   size: 10Gi
 
+# Confirmed live: gitea's own pod had NO resources set at all (chart
+# default resources: {}), and the bundled postgresql-ha subchart's
+# pgpool/postgresql both defaulted to resourcesPreset: "micro" (375m CPU /
+# 384Mi memory limit each). pgpool's own healthcheck script was timing out
+# under load ("command timed out ... after 5s"), triggering repeated
+# liveness-probe kills/restarts, which is what actually broke Gitea's DB
+# connectivity intermittently (seen live as "dial tcp ...:5432: connect:
+# operation not permitted" in gitea's logs, and as random 401s/dropped
+# sessions in the browser) — not a Gitea bug itself. Checked via a debug
+# pod actually scheduled on kub-ctrl-1 (this node runs ~50 pods including
+# 4 separate Postgres instances and all of Longhorn's CSI stack): load
+# average 5.5–10.9 on 8 cores with real swap usage — moderately pressured,
+# consistent with pgpool's tight preset being an easy first thing to fall
+# over under a load spike. This bump doesn't fix general node pressure,
+# just gives pgpool/gitea enough headroom to not be the most fragile thing
+# on the node.
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+postgresql-ha:
+  postgresql:
+    # "small" preset ~= 500m/512Mi request, 500m/512Mi limit (see the
+    # subchart's own values.yaml comment for exact preset numbers) — well
+    # above the "micro" default that was timing out under load.
+    resourcesPreset: small
+  pgpool:
+    resourcesPreset: small
+
 gitea:
   config:
     service:
