@@ -17,14 +17,16 @@ statefulset:
     kubernetes.io/hostname: pi1
 
   runner:
-    # See gitea-runner-amd64/values.yaml's comment — same reasoning,
-    # `runs-on: arm64` routes a workflow matrix job here specifically.
+    # See gitea-runner-amd64/values.yaml's comment — same reasoning
+    # (docker:// schema required, host schema has no docker binary
+    # available), `runs-on: arm64` routes a workflow matrix job here
+    # specifically.
     config: |
       log:
         level: info
       runner:
         labels:
-          - "arm64:host"
+          - "arm64:docker://docker:27-cli"
       cache:
         enabled: false
       container:

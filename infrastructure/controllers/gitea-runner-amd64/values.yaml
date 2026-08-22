@@ -30,10 +30,14 @@ statefulset:
 
   runner:
     # Labels this runner advertises to Gitea Actions — a workflow targets
-    # this specific architecture via `runs-on: amd64`. `host` schema (not
-    # `docker://<image>`) since steps just need `docker build` against the
-    # DinD sidecar's socket directly, no isolated per-job container image
-    # required for this use case. See
+    # this specific architecture via `runs-on: amd64`. Must be `docker://`
+    # schema, NOT `host` — confirmed live that the `runner` container
+    # itself has no `docker` binary at all (only the `dind` sidecar does);
+    # `host`-schema steps would fail immediately with "docker: not found"
+    # on any step that shells out to it. `docker://` schema runs each step
+    # inside a fresh container instead, with the DinD socket auto-mounted
+    # by act_runner — docker:27-cli has the CLI + buildx plugin needed for
+    # `docker build`/`docker buildx imagetools`. See
     # infrastructure/controllers/gitea-runner-arm64/values.yaml for the
     # sibling runner's `runs-on: arm64` label — this is what lets one
     # workflow matrix build both architectures on the right node each.
@@ -42,7 +46,7 @@ statefulset:
         level: info
       runner:
         labels:
-          - "amd64:host"
+          - "amd64:docker://docker:27-cli"
       cache:
         enabled: false
       container:
