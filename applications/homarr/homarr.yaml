@@ -1,0 +1,76 @@
+# Homarr (https://homarr.dev) — homepage dashboard linking out to every
+# other app in this cluster. Single standalone Deployment, no gluetun
+# netns needed — same shape as kavita/memos.
+#
+# Auth: Homarr has no "trust the reverse proxy" mode (only
+# Credentials/LDAP/OIDC — confirmed against its own Single-Sign-On docs),
+# so unlike memos/degoog/longhorn it does NOT sit behind a dedicated
+# oauth2-proxy instance. Instead it's its own Authelia OIDC client (see
+# infrastructure/controllers/authelia/values.yaml's "homarr" client entry),
+# same credential-pair pattern documented in
+# docs/oauth2-proxy-authelia.md, just terminating in Homarr itself instead
+# of oauth2-proxy.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homarr
+  namespace: homarr
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # RWO Longhorn data PVC — a RollingUpdate would try to attach it to two pods at once
+  selector:
+    matchLabels:
+      app: homarr
+  template:
+    metadata:
+      labels:
+        app: homarr
+    spec:
+      containers:
+        - name: homarr
+          image: ghcr.io/homarr-labs/homarr:1.76.0
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: AUTH_PROVIDERS
+              value: oidc
+            - name: AUTH_OIDC_ISSUER
+              value: https://auth.jvos.dev
+            - name: AUTH_OIDC_CLIENT_ID
+              value: homarr
+            - name: AUTH_OIDC_CLIENT_NAME
+              value: Authelia
+            - name: AUTH_OIDC_SCOPE_OVERWRITE
+              value: "openid profile email groups"
+            - name: SECRET_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: homarr-secrets
+                  key: secret-encryption-key
+            - name: AUTH_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: homarr-secrets
+                  key: oidc-client-secret
+          ports:
+            - containerPort: 7575
+          volumeMounts:
+            - name: data
+              mountPath: /appdata
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: homarr-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: homarr
+  namespace: homarr
+spec:
+  selector:
+    app: homarr
+  ports:
+    - port: 7575
+      targetPort: 7575

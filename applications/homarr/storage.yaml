@@ -1,0 +1,16 @@
+# Config/db only (Homarr stores its SQLite db + uploaded icons under
+# /appdata) — small, no bulk media like kavita/immich, so a plain
+# dynamically-provisioned Longhorn PVC is enough, same pattern as
+# applications/kavita/storage.yaml's config PVC.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homarr-data
+  namespace: homarr
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi
