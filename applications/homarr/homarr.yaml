@@ -51,17 +51,36 @@ spec:
             # Required by Auth.js (NextAuth) itself to encrypt the OIDC
             # login flow's JWE-encrypted state/session cookies — separate
             # from SECRET_ENCRYPTION_KEY above (that one only encrypts
-            # integration secrets Homarr stores in its own db). Missing
-            # this was the actual root cause of a real
-            # "?error=Configuration" / OAuthProfileParseError /
-            # ERR_JWE_DECRYPTION_FAILED loop on first deploy — confirmed
-            # against homarr-labs/homarr's own .env.example, which flags
-            # AUTH_SECRET as required for Auth.js regardless of provider.
+            # integration secrets Homarr stores in its own db). Confirmed
+            # required (not optional) against homarr-labs/homarr's own
+            # .env.example. NOTE: adding this alone did NOT fix the
+            # "?error=Configuration" login loop — see AUTH_OIDC_FORCE_USERINFO
+            # below for the actual root cause; ERR_JWE_DECRYPTION_FAILED in
+            # the logs was a downstream symptom of the callback already
+            # having failed for an unrelated reason, not evidence this var
+            # was the missing piece on its own.
             - name: AUTH_SECRET
               valueFrom:
                 secretKeyRef:
                   name: homarr-secrets
                   key: auth-secret
+            # Authelia v4.39+ (running here: v4.39.20) made its ID token
+            # claims spec-minimal by default (sub/aud/exp/... only, no
+            # name/email/preferred_username even when those scopes are
+            # requested) — see
+            # https://www.authelia.com/blog/4.39-release-notes/#id-token-changes.
+            # Homarr's OIDC profile() callback throws "OIDC provider did not
+            # return a name" when that happens (confirmed: this was the
+            # actual cause of the "?error=Configuration" redirect, matching
+            # homarr-labs/homarr#2635 exactly). Forcing the userinfo
+            # endpoint instead of the ID token restores the full claim set —
+            # this is Homarr's own recommended fix for Authelia specifically
+            # (see packages/auth/providers/oidc/oidc-provider.ts's comment
+            # in the homarr source), not Authelia's alternative
+            # claims_policies workaround (which Authelia's own docs call a
+            # "break-glass" measure, not the long-term-supported path).
+            - name: AUTH_OIDC_FORCE_USERINFO
+              value: "true"
             - name: AUTH_OIDC_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
