@@ -75,6 +75,7 @@ block — same set of hostnames, same targets.
 | `paperless.jvos.dev` | `192.168.1.240` |
 | `search.jvos.dev` | `192.168.1.240` |
 | `memos.jvos.dev` | `192.168.1.240` |
+| `start.jvos.dev` | `192.168.1.240` |
 | `headscale.jvos.dev` | `192.168.1.241` |
 
 ## Adding a new hostname later
