@@ -15,6 +15,23 @@ spec:
     requests:
       storage: 2Gi
 ---
+# memogram's local state: a flat text file mapping Telegram user IDs to
+# memos access tokens (see its store/store.go — plain line-based file, not
+# SQLite, so no WAL-on-NFS concern here either). Small, just needs to
+# survive pod restarts so users don't have to re-run /start each time.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: memogram-data
+  namespace: memos
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 100Mi
+---
 # Uploaded media (photos/attachments), on a dedicated new TrueNAS dataset —
 # same "new dataset for bulk media" convention as immich/uploads. Mounted at
 # /var/opt/memos/assets specifically: memos' Local Filesystem storage backend

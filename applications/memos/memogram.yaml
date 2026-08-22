@@ -1,0 +1,64 @@
+# memogram (https://github.com/usememos/memogram) — Telegram bot bridge for
+# memos. Not published as a container image upstream (release assets are
+# raw Go binaries only), so this uses the image built by the
+# infrastructure/controllers/gitea-runner-{amd64,arm64}/ pipeline defined
+# in the separate `memogram-build` Gitea repo — see docs/gitea-actions.md
+# for the full build runbook.
+#
+# Talks to memos over Connect-RPC (HTTP-based, not native gRPC despite
+# SERVER_ADDR's `dns:` naming convention — confirmed directly from
+# memogram's own client.go: it strips any `dns:`/gRPC-style prefix and
+# just uses the value as a plain http:// base URL). This matches current
+# memos versions exactly, which serve everything (REST/gRPC-Gateway/JSON)
+# on the single HTTP port via Echo — no separate raw gRPC listener exists
+# to connect to.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: memogram
+  namespace: memos
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # RWO Longhorn data PVC — a RollingUpdate would try to attach it to two pods at once
+  selector:
+    matchLabels:
+      app: memogram
+  template:
+    metadata:
+      labels:
+        app: memogram
+    spec:
+      # gitea.jvos.dev/jvhti/memogram is a private registry (the
+      # memogram-build repo it's pushed from is private) — k3s can't pull
+      # it anonymously. See CLAUDE.md's secrets table for how this Secret
+      # is created (docker-registry type, same admin PAT as gitea-admin-pat).
+      imagePullSecrets:
+        - name: gitea-registry-pull
+      containers:
+        - name: memogram
+          image: gitea.jvos.dev/jvhti/memogram:latest
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: SERVER_ADDR
+              value: http://memos:5230
+            - name: BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: memogram-bot-token
+                  key: token
+            # Extra layer on top of the /start <access_token> linking
+            # flow — restricts the bot to this one Telegram account even
+            # if a valid memos access token ever leaked.
+            - name: ALLOWED_USERNAMES
+              value: jvhti
+            - name: DATA
+              value: /data/data.txt
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: memogram-data
