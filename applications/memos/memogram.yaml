@@ -57,16 +57,16 @@ spec:
                 secretKeyRef:
                   name: memogram-bot-token
                   key: token
-            # ALLOWED_USERNAMES temporarily removed while debugging why
-            # Telegram shows zero pending updates for this bot at all
-            # (getWebhookInfo + getUpdates both empty right after a real
-            # /start attempt) — ruling out variables one at a time. This
-            # gate only matters after Telegram delivers an update to
-            # memogram in the first place, so it can't be the actual
-            # cause, but removing it removes one thing to reason about.
-            # Re-add once basic /start flow is confirmed working:
-            #   - name: ALLOWED_USERNAMES
-            #     value: jvhti
+            # Extra layer on top of the /start <access_token> linking
+            # flow — restricts the bot to this one Telegram account even
+            # if a valid memos access token ever leaked. (Briefly removed
+            # while debugging an initial delivery delay that turned out to
+            # be Telegram-side — first message to a freshly created bot
+            # can sit as a single checkmark for a couple minutes before
+            # actually reaching getUpdates; confirmed live, not a bug
+            # here.)
+            - name: ALLOWED_USERNAMES
+              value: jvhti
             - name: DATA
               value: /data/data.txt
           volumeMounts:
