@@ -1,0 +1,116 @@
+# Open WebUI (https://docs.openwebui.com) — chat frontend against a local
+# llama.cpp/Qwen server running on a separate LAN host (192.168.1.210:8090,
+# outside the cluster — no in-cluster networking needed, just outbound HTTP).
+# Single standalone Deployment, no gluetun netns needed — same shape as
+# kavita/memos/homarr.
+#
+# Auth: Open WebUI has its own OIDC client support (like Homarr), so it's
+# its own Authelia OIDC client (see
+# infrastructure/controllers/authelia/values.yaml's "openwebui" client
+# entry) instead of sitting behind a dedicated oauth2-proxy instance — same
+# credential-pair pattern documented in docs/oauth2-proxy-authelia.md, just
+# terminating in Open WebUI itself instead of oauth2-proxy.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openwebui
+  namespace: openwebui
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # RWO Longhorn data PVC — a RollingUpdate would try to attach it to two pods at once
+  selector:
+    matchLabels:
+      app: openwebui
+  template:
+    metadata:
+      labels:
+        app: openwebui
+    spec:
+      containers:
+        - name: openwebui
+          image: ghcr.io/open-webui/open-webui:v0.11.0
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            # llama.cpp's server exposes an OpenAI-compatible API — same
+            # backend/URL already used from opencode.json on this host.
+            - name: OPENAI_API_BASE_URL
+              value: http://192.168.1.210:8090/v1
+            # llama.cpp's server here takes no API key (opencode.json sends
+            # none either). A non-empty placeholder is safer than leaving
+            # this unset/empty — some OpenAI-compatible servers 400 on a
+            # missing Authorization header entirely rather than treating it
+            # as anonymous.
+            - name: OPENAI_API_KEY
+              value: "sk-none"
+            # No in-cluster/local Ollama backend — avoids Open WebUI trying
+            # to reach the default Ollama URL and logging noise.
+            - name: ENABLE_OLLAMA_API
+              value: "false"
+            # Keep local (credentials) auth alive alongside OIDC, same
+            # reasoning as Homarr (applications/homarr/homarr.yaml): needed
+            # for the very first admin account (OIDC users are never
+            # auto-granted admin) and as a fallback login if Authelia/OIDC
+            # is ever down or misconfigured. Deliberate tradeoff: a second
+            # exposed login form, accepted for the safety net.
+            - name: WEBUI_AUTH
+              value: "true"
+            # Required or every Authelia login fails outright — without
+            # this, an OIDC-authenticated identity with no pre-existing
+            # local Open WebUI account has no path to create one.
+            - name: ENABLE_OAUTH_SIGNUP
+              value: "true"
+            # Avoids a duplicate account if a local account with the same
+            # email as the OIDC identity already exists (e.g. the initial
+            # local admin account created above).
+            - name: OAUTH_MERGE_ACCOUNTS_BY_EMAIL
+              value: "true"
+            - name: OPENID_PROVIDER_URL
+              value: https://auth.jvos.dev/.well-known/openid-configuration
+            # Explicit rather than relying on an unstated default — must
+            # exactly match the redirect_uris entry on the Authelia client
+            # (infrastructure/controllers/authelia/values.yaml).
+            - name: OPENID_REDIRECT_URI
+              value: https://chat.jvos.dev/oauth/oidc/callback
+            - name: OAUTH_CLIENT_ID
+              value: openwebui
+            - name: OAUTH_PROVIDER_NAME
+              value: Authelia
+            - name: OAUTH_SCOPES
+              value: "openid email profile groups"
+            - name: OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-secrets
+                  key: oidc-client-secret
+            # Session/JWT signing secret. Unset = a new random one is
+            # generated on every pod boot, silently invalidating every
+            # session on each restart (same class of bug Homarr hit with
+            # AUTH_SECRET — see applications/homarr/secrets.yaml).
+            - name: WEBUI_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-secrets
+                  key: webui-secret-key
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: data
+              mountPath: /app/backend/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: openwebui-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openwebui
+  namespace: openwebui
+spec:
+  selector:
+    app: openwebui
+  ports:
+    - port: 8080
+      targetPort: 8080

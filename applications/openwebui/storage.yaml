@@ -1,0 +1,17 @@
+# Open WebUI's data dir (/app/backend/data) holds its own sqlite db, chat
+# history, uploaded files, and a local vector store for RAG — bigger than
+# Homarr's 2Gi config-only PVC (applications/homarr/storage.yaml), so start
+# more generous. Dynamically-provisioned Longhorn PVC, same pattern as every
+# other app here.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openwebui-data
+  namespace: openwebui
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi

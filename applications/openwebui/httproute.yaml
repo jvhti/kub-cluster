@@ -1,0 +1,25 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: openwebui
+  namespace: openwebui
+spec:
+  parentRefs:
+    - name: gateway-internal
+      namespace: gateway
+      sectionName: https
+  hostnames:
+    - "chat.jvos.dev"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        # Straight to the openwebui Service, same as homarr — Open WebUI is
+        # its own Authelia OIDC client (see openwebui.yaml's OAUTH_*/OPENID_*
+        # env vars), not fronted by a dedicated oauth2-proxy instance. No
+        # ReferenceGrant needed since this doesn't cross namespaces.
+        - name: openwebui
+          port: 8080
+          weight: 1

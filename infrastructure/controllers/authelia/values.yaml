@@ -74,6 +74,12 @@ pod:
         items:
           - key: client-secret-hash
             path: client-secret-hash.txt
+    - name: oidc-client-secret-openwebui
+      secret:
+        secretName: authelia-oidc-client-openwebui
+        items:
+          - key: client-secret-hash
+            path: client-secret-hash.txt
   extraVolumeMounts:
     - name: users-database
       mountPath: /config/users_database.yml
@@ -97,6 +103,10 @@ pod:
       readOnly: true
     - name: oidc-client-secret-homarr
       mountPath: /secrets/client-secret-hash-homarr.txt
+      subPath: client-secret-hash.txt
+      readOnly: true
+    - name: oidc-client-secret-openwebui
+      mountPath: /secrets/client-secret-hash-openwebui.txt
       subPath: client-secret-hash.txt
       readOnly: true
 
@@ -258,6 +268,30 @@ configMap:
             # Path is Homarr's own callback route, not oauth2-proxy's
             # /oauth2/callback used by every other client here.
             - 'https://start.jvos.dev/api/auth/callback/oidc'
+          scopes:
+            - 'openid'
+            - 'profile'
+            - 'email'
+            - 'groups'
+          grant_types:
+            - 'authorization_code'
+          response_types:
+            - 'code'
+        - client_id: 'openwebui'
+          client_name: 'Open WebUI'
+          client_secret:
+            path: '/secrets/client-secret-hash-openwebui.txt'
+          public: false
+          authorization_policy: 'one_factor'
+          redirect_uris:
+            # Not an oauth2-proxy instance — Open WebUI has its own OIDC
+            # client support (like Homarr), authenticating straight against
+            # Authelia (see applications/openwebui/openwebui.yaml's
+            # OAUTH_*/OPENID_* env vars). Path is Open WebUI's own fixed
+            # callback route (confirmed against its own SSO docs), not
+            # oauth2-proxy's /oauth2/callback used by every other client
+            # here.
+            - 'https://chat.jvos.dev/oauth/oidc/callback'
           scopes:
             - 'openid'
             - 'profile'
