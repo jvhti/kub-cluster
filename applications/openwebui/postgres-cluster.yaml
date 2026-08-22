@@ -1,0 +1,23 @@
+# Open WebUI's own Postgres, via CloudNativePG — same pattern as
+# applications/memos/postgres-cluster.yaml and
+# applications/degoog/postgres-cluster.yaml. Single instance, no HA, homelab
+# scale. Open WebUI defaults to SQLite (still used for nothing here — the
+# openwebui-data PVC in storage.yaml now holds only uploaded files/vector
+# store, not webui.db), switched to Postgres via DATABASE_URL in
+# openwebui.yaml for a real relational backend instead of SQLite-on-Longhorn.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: openwebui-postgres
+  namespace: openwebui
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17-bookworm
+  storage:
+    size: 5Gi
+    storageClass: longhorn
+  bootstrap:
+    initdb:
+      database: openwebui
+      owner: openwebui
+  enablePDB: false

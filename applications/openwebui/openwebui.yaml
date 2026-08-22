@@ -33,6 +33,24 @@ spec:
           env:
             - name: TZ
               value: America/Sao_Paulo
+            # Postgres (via CNPG, see postgres-cluster.yaml) instead of
+            # Open WebUI's default SQLite — same reasoning/shape as
+            # applications/memos/memos.yaml's MEMOS_DSN: DBUSER/DBPASS must
+            # be defined before DATABASE_URL below, since Kubernetes only
+            # resolves a $(VAR) reference against env vars defined earlier
+            # in this same list, in order.
+            - name: DBUSER
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-postgres-app
+                  key: username
+            - name: DBPASS
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-postgres-app
+                  key: password
+            - name: DATABASE_URL
+              value: postgresql://$(DBUSER):$(DBPASS)@openwebui-postgres-rw:5432/openwebui
             # llama.cpp's server exposes an OpenAI-compatible API — same
             # backend/URL already used from opencode.json on this host.
             - name: OPENAI_API_BASE_URL
