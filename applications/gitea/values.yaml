@@ -39,16 +39,6 @@ postgresql-ha:
     # subchart's own values.yaml comment for exact preset numbers) — well
     # above the "micro" default that was timing out under load.
     resourcesPreset: small
-    # Chart default is 3 (1 primary + 2 standbys) — excessive for a
-    # single-user homelab. 2 = 1 primary + 1 standby, keeps repmgr
-    # auto-failover (a lone remaining node can still be promoted). Note:
-    # scaling 3->2 removes ordinal 2 (highest), so if a non-zero ordinal
-    # happens to be primary at sync time (it was, after the 2026-08-22
-    # reboot incident), the scale-down forces a repmgr failover to the
-    # remaining node and pgpool re-routes — expect a brief Gitea DB blip.
-    # The scaled-down ordinal's PVC is kept by the StatefulSet and must be
-    # deleted by hand afterwards to reclaim NVMe.
-    replicaCount: 2
   pgpool:
     resourcesPreset: small
 
