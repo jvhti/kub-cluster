@@ -7,6 +7,27 @@
 # properties 'authentication_backend', 'identity_providers', 'session',
 # 'storage' not allowed" at the root).
 
+# configMap.storage.local.path ('/config/db.sqlite3') was, until this was
+# added, sitting on plain unnamed container storage with NO backing
+# volume at all — confirmed directly from this chart's own deployment
+# template: it only falls back to an explicit emptyDir when BOTH
+# pod.extraVolumes and pod.extraVolumeMounts are empty, and this file
+# already populates both (for users-database/oidc-issuer-key/
+# oidc-client-secret* below) — so neither the emptyDir fallback nor a
+# real PVC applied. Every pod restart/reschedule silently wiped
+# db.sqlite3, which holds OIDC opaque subject identifiers, consent
+# records, and sessions. Confirmed as a real, live bug: a routine
+# authelia restart (during Homarr's OIDC setup) regenerated a new `sub`
+# for an already-linked user, breaking Homarr's stored account link with
+# OAuthAccountNotLinked — any future OIDC client would hit the same
+# class of breakage on every Authelia restart. persistence.enabled adds
+# a proper Longhorn-backed PVC mounted at /config (the chart's own
+# hardcoded mount path for this volume, not configurable).
+persistence:
+  enabled: true
+  storageClass: longhorn
+  size: 500Mi # db.sqlite3 + notification.txt only — tiny, generous headroom over the chart's 100Mi default
+
 pod:
   # Chart defaults to DaemonSet (one pod per node). Combined with
   # configMap.storage.local (SQLite, local to each pod) that meant 3
