@@ -15,6 +15,26 @@ spec:
       labels:
         app: wireguard
     spec:
+      # Pinned to overkill: it is the only node whose kubelet allows the
+      # required unsafe sysctl net.ipv4.ip_forward (allowedUnsafeSysctls was
+      # added there for tailscale-router). Confirmed live: after the pod
+      # last left overkill, every replacement landed on kub-ctrl-1 and sat
+      # in SysctlForbidden for 39h, piling up 1000+ zombie pods. This pod
+      # has no gateway-VIP dependency (inbound is the DMZ-forwarder LXC
+      # DNATing to the plain NodePort), so the overkill BPIP bug (cilium
+      # dev build's broken local pod->proxy-port redirect, see
+      # tailscale-router/deployment.yaml) doesn't apply here. Proper fix:
+      # add the sysctl to another node's k3s kubelet args, then drop the
+      # pin (and tailscale-router's).
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - overkill
       # net.ipv4.conf.all.src_valid_mark deliberately NOT set here despite
       # being wg-quick's usual recommendation for policy-routing setups:
       # confirmed live this crash-loops the pod (SysctlForbidden - only
