@@ -16,3 +16,32 @@ helmCharts:
 
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "-2" # After authelia (-3), same wave as the other oauth2-proxy instances.
+
+# overkill is the BPIP owner node for the gateway VIPs and in the current
+# cilium dev build its local pod->proxy-port BPF redirect is broken there
+# (pods can't reach auth.jvos.dev -> 192.168.1.240, so oauth2-proxy crash
+# loops at "Performing OIDC Discovery..."). Keep this pod off overkill until
+# the cilium build is fixed - see tailscale-router/deployment.yaml's comment
+# for the full diagnosis.
+patches:
+  - target:
+      kind: Deployment
+      name: oauth2-proxy-alertmanager
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: oauth2-proxy-alertmanager
+        namespace: oauth2-proxy-alertmanager
+      spec:
+        template:
+          spec:
+            affinity:
+              nodeAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  nodeSelectorTerms:
+                    - matchExpressions:
+                        - key: kubernetes.io/hostname
+                          operator: NotIn
+                          values:
+                            - overkill

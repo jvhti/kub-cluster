@@ -16,6 +16,24 @@ spec:
         app: tailscale-router
     spec:
       serviceAccountName: tailscale-router
+      # overkill is the BPIP owner node for the gateway VIPs (192.168.1.240/.241)
+      # and in the current cilium dev build (v1.35.9-1770979049-*) its local
+      # pod->proxy-port BPF redirect is broken: pods scheduled there can reach
+      # nothing on .240/.241 (the host path and cross-node pod paths both work -
+      # confirmed live with cilium monitor: the pod's SYN reaches "proxy port
+      # 15532" and vanishes, while curl to 127.0.0.1:15532 on the host itself
+      # returns 200). tailscaled can't reach headscale (headscale.jvos.dev ->
+      # .241) to log in, so after a rollout the liveness probe killed/restarted
+      # it 15x in 68min. Keep it off overkill until the cilium build is fixed.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - overkill
       # Required for subnet routing / exit-node packet forwarding to actually
       # work, not just for the boot script to stop hanging - confirmed live:
       # "Subnet routing is enabled, but IP forwarding is disabled" health
