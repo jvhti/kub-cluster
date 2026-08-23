@@ -29,14 +29,16 @@ prometheus:
           resources:
             requests:
               storage: 10Gi
-    # Resource allocation (starter-friendly & low-end hardware optimized)
+    # Resource allocation. The 1Gi limit used to OOM-kill prometheus (138x,
+    # exit 137) while serving the full k8s scrape set; kub-node-1 has 15.5GiB
+    # so 4Gi headroom is comfortable.
     resources:
       requests:
         cpu: 100m
-        memory: 512Mi
+        memory: 2Gi
       limits:
         cpu: 500m
-        memory: 1Gi
+        memory: 4Gi
     # Scrape configuration
     scrapeInterval: 30s
     evaluationInterval: 30s
