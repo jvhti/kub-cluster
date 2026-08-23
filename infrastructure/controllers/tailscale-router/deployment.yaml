@@ -16,24 +16,46 @@ spec:
         app: tailscale-router
     spec:
       serviceAccountName: tailscale-router
-      # overkill is the BPIP owner node for the gateway VIPs (192.168.1.240/.241)
-      # and in the current cilium dev build (v1.35.9-1770979049-*) its local
-      # pod->proxy-port BPF redirect is broken: pods scheduled there can reach
-      # nothing on .240/.241 (the host path and cross-node pod paths both work -
-      # confirmed live with cilium monitor: the pod's SYN reaches "proxy port
-      # 15532" and vanishes, while curl to 127.0.0.1:15532 on the host itself
-      # returns 200). tailscaled can't reach headscale (headscale.jvos.dev ->
-      # .241) to log in, so after a rollout the liveness probe killed/restarted
-      # it 15x in 68min. Keep it off overkill until the cilium build is fixed.
+      # Pinned to overkill: it is the only node whose kubelet allows the
+      # unsafe sysctls below (net.ipv4.ip_forward, net.ipv6.conf.all.forwarding).
+      # Confirmed live: after a NotIn-overkill pin, kub-ctrl-1 rejected the pod
+      # with SysctlForbidden and crash-looped it 130x. (Proper fix: add
+      # --allowed-unsafe-sysctls=net.ipv4.ip_forward,net.ipv6.conf.all.forwarding
+      # to another node's k3s kubelet args, then drop this pin.)
+      #
+      # overkill is also the BPIP owner node for the gateway VIPs
+      # (192.168.1.240/.241) and in the current cilium dev build
+      # (v1.35.9-1770979049-*) its local pod->proxy-port BPF redirect is
+      # broken: pods scheduled there can reach nothing on .240/.241 (host
+      # path and cross-node pod paths both work - confirmed live with cilium
+      # monitor: the pod's SYN reaches "proxy port 15532" and vanishes, while
+      # curl to 127.0.0.1:15532 on the host itself returns 200). Without a
+      # workaround tailscaled can't reach headscale (headscale.jvos.dev ->
+      # .241) to log in.
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
                   - key: kubernetes.io/hostname
-                    operator: NotIn
+                    operator: In
                     values:
                       - overkill
+      # Workaround for the broken pod->.241 path on overkill: resolve
+      # headscale.jvos.dev straight to headscale's ClusterIP instead of the
+      # gateway BPIP. Works because gateway-headscale is TLS *passthrough*
+      # (the headscale pod terminates TLS itself on :8443 with its own cert),
+      # so the plain ClusterIP Service carries the identical, valid TLS
+      # endpoint. Verified live from a pod pinned to overkill:
+      #   curl --resolve headscale.jvos.dev:443:10.43.169.125 https://headscale.jvos.dev:443 -> 200
+      #   curl --resolve headscale.jvos.dev:443:192.168.1.241  https://headscale.jvos.dev:443 -> timeout
+      # Fragile: the ClusterIP changes if the Service is deleted/recreated
+      # (check `kubectl get svc headscale -n headscale`). Remove this
+      # hostAlias (and the pin above) once the cilium build is fixed.
+      hostAliases:
+        - ip: 10.43.169.125
+          hostnames:
+            - headscale.jvos.dev
       # Required for subnet routing / exit-node packet forwarding to actually
       # work, not just for the boot script to stop hanging - confirmed live:
       # "Subnet routing is enabled, but IP forwarding is disabled" health
