@@ -30,15 +30,18 @@ prometheus:
             requests:
               storage: 10Gi
     # Resource allocation. The 1Gi limit used to OOM-kill prometheus (138x,
-    # exit 137) while serving the full k8s scrape set; kub-node-1 has 15.5GiB
-    # so 4Gi headroom is comfortable.
+    # exit 137) while serving the full k8s scrape set; the node has ~15.6GiB
+    # allocatable. The 4Gi limit still OOM-killed during a one-time WAL replay
+    # of ~280 segments (peak >4Gi, and replay can't checkpoint mid-flight so
+    # every restart re-replayed the whole WAL from 0 -> crash-loop). Bumped to
+    # 8Gi so a full replay can complete; steady-state sits well below this.
     resources:
       requests:
         cpu: 100m
-        memory: 2Gi
+        memory: 4Gi
       limits:
         cpu: 500m
-        memory: 4Gi
+        memory: 8Gi
     # Scrape configuration
     scrapeInterval: 30s
     evaluationInterval: 30s
