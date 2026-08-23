@@ -15,17 +15,16 @@ spec:
       labels:
         app: wireguard
     spec:
-      # Pinned to overkill: it is the only node whose kubelet allows the
-      # required unsafe sysctl net.ipv4.ip_forward (allowedUnsafeSysctls was
-      # added there for tailscale-router). Confirmed live: after the pod
-      # last left overkill, every replacement landed on kub-ctrl-1 and sat
-      # in SysctlForbidden for 39h, piling up 1000+ zombie pods. This pod
-      # has no gateway-VIP dependency (inbound is the DMZ-forwarder LXC
-      # DNATing to the plain NodePort), so the overkill BPIP bug (cilium
-      # dev build's broken local pod->proxy-port redirect, see
-      # tailscale-router/deployment.yaml) doesn't apply here. Proper fix:
-      # add the sysctl to another node's k3s kubelet args, then drop the
-      # pin (and tailscale-router's).
+      # Pinned to kub-node-1: it allows the required unsafe sysctl
+      # net.ipv4.ip_forward (confirmed live with a test pod) AND it is the
+      # node the wireguard-config Longhorn PV's nodeAffinity points at -
+      # pinning overkill (which also allows the sysctl) deadlocked the pod
+      # in Pending ("didn't match PersistentVolume's node affinity").
+      # Only kub-ctrl-1 lacks the allowlist: after the pod last left a
+      # working node, replacements kept landing there and sat in
+      # SysctlForbidden for 39h, piling up 1000+ zombie pods. Proper fix:
+      # add the sysctl to kub-ctrl-1's k3s kubelet args, then drop this
+      # pin (and tailscale-router's overkill pin).
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -34,7 +33,7 @@ spec:
                   - key: kubernetes.io/hostname
                     operator: In
                     values:
-                      - overkill
+                      - kub-node-1
       # net.ipv4.conf.all.src_valid_mark deliberately NOT set here despite
       # being wg-quick's usual recommendation for policy-routing setups:
       # confirmed live this crash-loops the pod (SysctlForbidden - only
