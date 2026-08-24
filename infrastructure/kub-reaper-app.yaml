@@ -1,0 +1,50 @@
+# ArgoCD Application for kub-reaper — a standalone Gitea-only repo
+# (deliberately NO GitHub mirror; ArgoCD clones it directly from Gitea).
+#
+# Like the *-appset.yaml files, this is a reference copy: applied
+# imperatively, not synced by any app in this repo:
+#   kubectl apply -f infrastructure/kub-reaper-app.yaml
+#
+# One-time prerequisites (imperative):
+#   - The `infrastructure` AppProject ships with sourceRepos restricted to
+#     the GitHub kub-cluster URL; add the Gitea URL:
+#     kubectl patch appproject infrastructure -n argocd --type=json \
+#       -p='[{"op":"add","path":"/spec/sourceRepos/-",
+#             "value":"https://gitea.jvos.dev/jvhti/kub-reaper.git"}]'
+#   - The gitea-registry-pull docker-registry Secret in ns kub-reaper
+#     (see the kub-reaper repo's manifests/pull-secret.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kub-reaper
+  namespace: argocd
+  labels:
+    type: infrastructure
+spec:
+  project: infrastructure
+  source:
+    plugin:
+      name: kustomize-build-with-helm
+    repoURL: https://gitea.jvos.dev/jvhti/kub-reaper.git
+    targetRevision: HEAD
+    path: manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kub-reaper
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+    - ApplyOutOfSyncOnly=true
+    - Replace=false
+    - IgnoreMissingTemplate=true

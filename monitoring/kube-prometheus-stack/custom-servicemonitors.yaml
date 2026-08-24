@@ -88,3 +88,25 @@ spec:
     - port: metrics
       interval: 30s
       path: /metrics
+---
+# ServiceMonitor for kub-reaper (zombie pod sweeper — repo: Gitea jvhti/kub-reaper)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kub-reaper-metrics
+  namespace: kube-prometheus-stack
+  labels:
+    app.kubernetes.io/name: kub-reaper
+    release: prometheus
+    prometheus: prometheus-kube-prometheus-stack-prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kub-reaper
+  namespaceSelector:
+    matchNames:
+      - kub-reaper
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics

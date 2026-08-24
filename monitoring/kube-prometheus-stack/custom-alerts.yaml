@@ -107,6 +107,26 @@ spec:
           annotations:
             summary: "Longhorn node {{ $labels.node }} storage space is low"
             description: "Longhorn node {{ $labels.node }} storage usage is above 90% (current value: {{ printf \"%.2f\" $value }}%)"
+    # Kub-reaper (zombie pod sweeper — repo: Gitea jvhti/kub-reaper)
+    - name: kub.reaper
+      interval: 30s
+      rules:
+        - alert: ReaperZombiePods
+          expr: sum by (reason) (kub_reaper_zombie_pods) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Zombie pods in unrecoverable state ({{ $labels.reason }})"
+            description: "{{ $value }} pod(s) have been stuck in an unrecoverable state ({{ $labels.reason }}) for more than 5 minutes. kub-reaper deletes them after their grace period, but the owning controller re-creates them until the root cause is fixed."
+        - alert: ReaperDown
+          expr: up{job="kub-reaper-metrics"} == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "kub-reaper is not scrapeable"
+            description: "Prometheus has not been able to scrape kub-reaper's metrics endpoint for more than 10 minutes."
     # Prometheus Stack Health
     - name: monitoring.stack.health
       interval: 30s
