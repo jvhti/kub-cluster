@@ -12,3 +12,16 @@ spec:
     - wlp.*
   loadBalancerIPs: true
   externalIPs: true
+  # overkill excluded: its physical NIC (enp4s0) drops packets under its
+  # normal Longhorn/VXLAN load (confirmed live via /proc/net/dev RX drop
+  # counter climbing, plus cilium_bpf_ratelimit_dropped_total actively
+  # incrementing) once it also takes on L2-announcement leadership for the
+  # Gateway VIP — every *.jvos.dev app went unreachable externally whenever
+  # the announcement lease landed on this node specifically (2026-08-24/25
+  # incident). The other 3 nodes handle the lease fine.
+  nodeSelector:
+    matchExpressions:
+      - key: kubernetes.io/hostname
+        operator: NotIn
+        values:
+          - overkill
