@@ -40,7 +40,20 @@ postgresql-ha:
     # above the "micro" default that was timing out under load.
     resourcesPreset: small
   pgpool:
-    resourcesPreset: small
+    # "small" preset resolves to a 768Mi memory limit in this chart version
+    # (confirmed live via the running pod's actual resources, not the
+    # comment above which was written for a different symptom) — still not
+    # enough: pgpool was hitting "container init was OOM-killed" on every
+    # single start, 470+ CrashLoopBackOff restarts over ~40h, before ever
+    # reaching a healthy state. Overriding explicitly well past the preset
+    # rather than trusting another preset tier to be enough.
+    resources:
+      requests:
+        cpu: 250m
+        memory: 768Mi
+      limits:
+        cpu: 750m
+        memory: 1536Mi
 
 gitea:
   config:
