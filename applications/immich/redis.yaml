@@ -15,6 +15,20 @@ spec:
       labels:
         app: immich-redis
     spec:
+      # kub-node-1's Longhorn/iSCSI block-device layer got stuck returning
+      # "Device or resource busy" on every mount/format attempt (even on a
+      # brand-new PVC), surviving two full node reboots (2026-08-29 incident).
+      # Steer this pod off kub-node-1 until that's root-caused; remove once
+      # confirmed fixed.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - kub-node-1
       containers:
         - name: redis
           image: valkey/valkey:8.1.4
