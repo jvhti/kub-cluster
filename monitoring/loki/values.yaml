@@ -24,6 +24,17 @@ loki:
     volume_enabled: true
     retention_period: 7d
 
+# Chart default allocatedMemory (8192MB) sizes the chunks-cache memcached's
+# own -m flag to 8Gi, with resources.limits auto-derived as 1.2x that
+# (9830Mi) - sized for real production log volume. Nothing ships logs into
+# this cluster's Loki yet (no Promtail/Alloy/Vector/Fluent Bit deployed) -
+# Loki currently has zero series ingested - so shrink drastically until that
+# changes. Setting allocatedMemory (not just resources) matters: it's what
+# tells memcached itself how much to try to use, so the process and its
+# cgroup limit stay in agreement.
+chunksCache:
+  allocatedMemory: 256
+
 # SingleBinary mode - simplest deployment for filesystem storage
 deploymentMode: SingleBinary
 singleBinary:
