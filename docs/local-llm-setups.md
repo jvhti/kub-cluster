@@ -15,7 +15,7 @@ either host.
 | Driver | NVIDIA 595.99.02 (host) + matching userspace libs (container) | NVIDIA 610.43.03 |
 | CUDA toolkit | 13.3 (`/usr/local/cuda-13.3`) | 13.3 (`/opt/cuda`) |
 | llama.cpp | built from source, CUDA (`sm_75`) | built from source, CUDA (`sm_89`) |
-| Serving mode | router mode, 2 models, swap on demand | router mode, 2 models, swap on demand |
+| Serving mode | router mode, 2 models, swap on demand | router mode, 3 models, swap on demand |
 | Port | `8080` | `8090` |
 | Systemd unit | `llama-server.service` (root, in an unprivileged LXC) | `llama-server.service` (user `jvhti`) |
 
@@ -31,6 +31,17 @@ TTY through typical automation) or guessing the password.
 ---
 
 ## Proxmox box (`192.168.1.202`, LXC 139) — RTX 2060, 6GB VRAM
+
+### Using it (API endpoint)
+
+**`http://192.168.1.18:8080`** — OpenAI-compatible (`/v1/chat/completions`,
+`/v1/models`, etc.), no auth, plain HTTP, LAN-only (`--host 0.0.0.0`, not
+exposed externally). `192.168.1.18` is a **DHCP lease on the LXC**, not a
+static/reserved address — confirm it hasn't moved (`pct exec 139 -- ip -4
+addr show eth0`) before assuming it's still current, especially after a
+container or DHCP server restart. `GET /health` is the quickest liveness
+check. See the router-mode section below for which `"model"` values to
+pass in requests.
 
 ### Why the host needed fixing first
 
@@ -200,6 +211,17 @@ Already had a working, well-tuned setup before this round of work (driver,
 CUDA toolkit, llama.cpp build all pre-existing) — this pass was rebuild +
 re-benchmark + apply idle-sleep, not a from-scratch build like the Proxmox
 box.
+
+### Using it (API endpoint)
+
+**`http://192.168.1.211:8090`** — OpenAI-compatible, no auth, plain HTTP,
+LAN-only (`--host 0.0.0.0`, not exposed externally). This is the host's own
+static LAN IP (not a container/DHCP lease like the Proxmox box), so it's
+stable. `overkill` also has a Tailscale interface (`tailscale0`,
+`100.100.14.52` at last check) if remote access off-LAN is ever needed —
+untested for this purpose, would need Tailscale ACLs/routing configured to
+actually work, not just being present. `GET /health` for liveness. See the
+router-mode section below for which `"model"` values to pass in requests.
 
 ### Models: router mode, three models
 
