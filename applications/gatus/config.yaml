@@ -43,20 +43,31 @@ data:
         conditions:
           - "[STATUS] == 200"
 
+      # longhorn/memos/search all sit behind their own dedicated
+      # oauth2-proxy instance (see docs/oauth2-proxy-authelia.md) and
+      # return 403 on an unauthenticated GET / — not a redirect, so Gatus's
+      # HTTP client never gets a chance to follow it to a 200 the way it
+      # does for jellyfin/paperless below. Hitting /ping instead — a
+      # built-in oauth2-proxy endpoint that always answers 200 and
+      # deliberately bypasses auth — checks that oauth2-proxy itself (and
+      # therefore its config/Secret/OIDC wiring) is alive, without needing
+      # real credentials. It doesn't independently confirm the backend
+      # app behind oauth2-proxy is healthy, only that the gate in front of
+      # it is answering.
       - name: longhorn
-        url: "https://longhorn.jvos.dev"
+        url: "https://longhorn.jvos.dev/ping"
         interval: 1m
         conditions:
           - "[STATUS] == 200"
 
       - name: memos
-        url: "https://memos.jvos.dev"
+        url: "https://memos.jvos.dev/ping"
         interval: 1m
         conditions:
           - "[STATUS] == 200"
 
       - name: search
-        url: "https://search.jvos.dev"
+        url: "https://search.jvos.dev/ping"
         interval: 1m
         conditions:
           - "[STATUS] == 200"
