@@ -1,0 +1,87 @@
+# Gatus (https://github.com/TwiN/gatus) — lightweight status/uptime
+# monitoring dashboard, like Uptime Kuma but config-as-code (YAML) and with
+# a real Postgres storage backend (config.yaml, storage.type: postgres) so
+# history survives pod restarts/redeploys — unlike Uptime Kuma, which is
+# SQLite-only. No PVC needed here: config is a ConfigMap, all persistent
+# state (check history) lives in gatus-postgres.
+#
+# Auth: Gatus has native OIDC support in its own config (security.oidc —
+# see config.yaml), so — same reasoning as Homarr/Open WebUI — it's its own
+# Authelia OIDC client rather than sitting behind a dedicated oauth2-proxy
+# instance (see infrastructure/controllers/authelia/values.yaml's "gatus"
+# client entry, and docs/oauth2-proxy-authelia.md's credential-pair
+# procedure, followed here even though the client terminates in Gatus
+# itself rather than oauth2-proxy).
+#
+# NOTE: like every other app here, this Deployment does NOT hot-reload on a
+# ConfigMap/Secret change (Gatus reads config.yaml once at startup) — after
+# editing config.yaml or gatus-secrets, `kubectl rollout restart
+# deploy/gatus -n gatus` is required.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gatus
+  namespace: gatus
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate # No local PVC — safe to roll normally, unlike the Recreate apps here with an RWO Longhorn volume
+  selector:
+    matchLabels:
+      app: gatus
+  template:
+    metadata:
+      labels:
+        app: gatus
+    spec:
+      containers:
+        - name: gatus
+          image: ghcr.io/twin/gatus:stable
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: GATUS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: gatus-postgres-app
+                  key: password
+            - name: GATUS_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: gatus-secrets
+                  key: oidc-client-secret
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: config
+              mountPath: /config
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 5
+      volumes:
+        - name: config
+          configMap:
+            name: gatus-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gatus
+  namespace: gatus
+spec:
+  selector:
+    app: gatus
+  ports:
+    - port: 8080
+      targetPort: 8080

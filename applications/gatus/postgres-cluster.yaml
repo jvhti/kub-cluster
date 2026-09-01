@@ -1,0 +1,22 @@
+# Gatus' own Postgres, via CloudNativePG — same pattern as
+# applications/memos/postgres-cluster.yaml, applications/degoog/postgres-cluster.yaml,
+# and applications/immich/postgres-cluster.yaml. Single instance, no HA,
+# homelab scale. Gatus defaults to an in-memory store (history lost on every
+# restart/redeploy) unless storage.type is set to postgres — see gatus.yaml's
+# config.yaml ConfigMap.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: gatus-postgres
+  namespace: gatus
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17-bookworm
+  storage:
+    size: 2Gi
+    storageClass: longhorn
+  bootstrap:
+    initdb:
+      database: gatus
+      owner: gatus
+  enablePDB: false

@@ -1,0 +1,92 @@
+# Gatus' main config: storage backend, OIDC auth, and the monitored
+# endpoints. Mounted into the pod at /config/config.yaml (gatus.yaml).
+#
+# Secrets are NOT inlined here — Gatus expands ${VAR}/$VAR from its own
+# process environment at load time (see "Use environment variables in
+# config files" in https://github.com/TwiN/gatus#readme), so the actual
+# Postgres password and OIDC client secret are injected as env vars from
+# Kubernetes Secrets in gatus.yaml instead, keeping this ConfigMap safe to
+# commit.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gatus-config
+  namespace: gatus
+data:
+  config.yaml: |
+    storage:
+      type: postgres
+      path: "postgres://gatus:${GATUS_DB_PASSWORD}@gatus-postgres-rw:5432/gatus?sslmode=disable"
+
+    ui:
+      title: "jvos.dev status"
+      header: "jvos.dev"
+
+    security:
+      oidc:
+        issuer-url: "https://auth.jvos.dev"
+        redirect-url: "https://status.jvos.dev/authorization-code/callback"
+        client-id: "gatus"
+        client-secret: "${GATUS_OIDC_CLIENT_SECRET}"
+        scopes: ["openid", "profile", "email", "groups"]
+
+    endpoints:
+      - name: argocd
+        url: "https://argocd.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: gitea
+        url: "https://gitea.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: longhorn
+        url: "https://longhorn.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: memos
+        url: "https://memos.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: search
+        url: "https://search.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: jellyfin
+        url: "https://jellyfin.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: paperless
+        url: "https://paperless.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: headscale
+        url: "https://headscale.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: auth (authelia)
+        url: "https://auth.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: gateway-internal VIP
+        url: "tcp://192.168.1.240:443"
+        interval: 1m
+        conditions:
+          - "[CONNECTED] == true"
