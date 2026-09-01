@@ -72,8 +72,64 @@ data:
         conditions:
           - "[STATUS] == 200"
 
+      # Same oauth2-proxy /ping reasoning as longhorn/memos/search above —
+      # gates public prometheus.jvos.dev/alertmanager.jvos.dev.
+      - name: prometheus
+        url: "https://prometheus.jvos.dev/ping"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: alertmanager
+        url: "https://alertmanager.jvos.dev/ping"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
       - name: jellyfin
         url: "https://jellyfin.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: jellyseerr
+        url: "https://jellyseerr.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: jellystat
+        url: "https://jellystat.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: prowlarr
+        url: "https://prowlarr.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: sonarr
+        url: "https://sonarr.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: radarr
+        url: "https://radarr.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: bazarr
+        url: "https://bazarr.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: qbittorrent
+        url: "https://qbittorrent.jvos.dev"
         interval: 1m
         conditions:
           - "[STATUS] == 200"
@@ -84,8 +140,46 @@ data:
         conditions:
           - "[STATUS] == 200"
 
+      - name: books (kavita)
+        url: "https://books.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: fotos (immich)
+        url: "https://fotos.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: start (homarr)
+        url: "https://start.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: chat (open webui)
+        url: "https://chat.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: grafana
+        url: "https://grafana.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
       - name: headscale
         url: "https://headscale.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      # Mounted under /admin/ — bare / renders nothing (see CLAUDE.md's
+      # Headscale/Headplane operational notes).
+      - name: headscale-admin (headplane)
+        url: "https://headscale-admin.jvos.dev/admin/"
         interval: 1m
         conditions:
           - "[STATUS] == 200"
