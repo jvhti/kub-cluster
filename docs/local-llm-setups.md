@@ -201,19 +201,29 @@ CUDA toolkit, llama.cpp build all pre-existing) — this pass was rebuild +
 re-benchmark + apply idle-sleep, not a from-scratch build like the Proxmox
 box.
 
-### Models: router mode, two models
+### Models: router mode, three models
 
-Same rationale as the Proxmox box, different cause — the 27B model alone
-already uses ~22.7GB of the 24GB card at full 131072 context, so there's no
-room to also keep a second model resident. Converted from a single always-on
-process to router mode once a second model was added.
+Same rationale as the Proxmox box, different cause — a single 27B model
+already uses ~22.4-22.7GB of the 24GB card at full 131072 context, so
+there's no room to keep a second (let alone third) model resident
+simultaneously. Converted from a single always-on process to router mode
+once a second model was added, then a third.
 
 - **`qwen3.8-27b`** — `Qwen3.8-27B-Q4_K_M.gguf`
-  (`/home/jvhti/Models/`), same Qwen3.5-family hybrid Gated-DeltaNet
-  architecture as the 4B model on the Proxmox box, at 27B scale. Has a
-  multi-token-prediction (MTP) head baked in as an extra model layer, used
-  for speculative decoding (see below).
-- A second, smaller model registered alongside it (HF-cache layout under
+  (`/home/jvhti/Models/`), Qwen3.5-family hybrid Gated-DeltaNet
+  architecture, same family as the 4B model on the Proxmox box, at 27B
+  scale. Has a multi-token-prediction (MTP) head baked in as an extra
+  model layer, used for speculative decoding (see below).
+- **`huihui-qwen3.6-27b`** — `Huihui-Qwen3.6-27B-abliterated-Q4_K.gguf`,
+  from `huihui-ai/Huihui-Qwen3.6-27B-abliterated-MTP-GGUF` on Hugging Face.
+  Same `qwen35` architecture family as `qwen3.8-27b` (65 layers, native
+  `context_length = 262144` per `gguf_dump.py`, though capped to 131072 in
+  the preset to match available VRAM). Kept the MTP head, so speculative
+  decoding works here too — confirmed live (`draft_n_accepted: 40/55` on a
+  test request). Near-identical `llama-bench` profile to `qwen3.8-27b`
+  (~3000 pp / ~49.3-49.9 tg on matched KV types), so reused the same tuned
+  settings rather than re-deriving them.
+- A third, smaller model registered alongside them (HF-cache layout under
   `/home/jvhti/Models/models--...`, resolved via its `snapshots/<hash>/*.gguf`
   symlink). File size initially suggested a ~12-14B model, but
   `gguf_dump.py` showed it's actually **`general.architecture = gemma2`,
@@ -258,6 +268,17 @@ cache-type-k  = f16
 cache-type-v  = f16
 batch-size    = 2048
 ubatch-size   = 512
+
+[huihui-qwen3.6-27b]
+model         = /home/jvhti/Models/Huihui-Qwen3.6-27B-abliterated-Q4_K.gguf
+ctx-size      = 131072
+cache-type-k  = q4_0
+cache-type-v  = q4_0
+batch-size    = 2048
+ubatch-size   = 512
+cache-prompt  = 1
+cache-ram     = 16384
+spec-type     = draft-mtp
 ```
 
 ### Current `ExecStart`
@@ -271,13 +292,16 @@ ubatch-size   = 512
 ```
 
 `--models-max 1` forces one model resident at a time, same as the Proxmox
-box — request `"model": "qwen3.8-27b"` or `"model": "gemma2-9b"` in the
-request body (both appear in `GET /v1/models`, actual `[section]` name is
-whatever the preset uses). Note the Gemma2 model does **not** have
-`--reasoning off` set (unlike the Proxmox preset) — it's not a
-reasoning-capable model in the first place, so it wasn't needed; the 27B
-model still shows `reasoning_content` in responses by design
-(`chat-template-kwargs reasoning_effort: medium`), unchanged from before.
+box — request `"model": "qwen3.8-27b"`, `"model": "huihui-qwen3.6-27b"`, or
+`"model": "gemma2-9b"` in the request body (all three appear in `GET
+/v1/models`, actual `[section]` names are whatever the preset uses). Note
+the Gemma2 model does **not** have `--reasoning off` set (unlike the
+Proxmox preset) — it's not a reasoning-capable model in the first place, so
+it wasn't needed; both 27B models still show `reasoning_content` in
+responses by design (thinking mode not disabled), so budget `max_tokens`
+generously with them — a bare `reasoning_effort: low` still consumed 60+
+tokens purely on the reasoning preamble in testing before any answer text
+appeared.
 
 ### Tuning notes (RTX 4090 / Ada Lovelace, `sm_89`)
 
