@@ -34,6 +34,32 @@ spec:
       labels:
         app: gatus
     spec:
+      # Steer this pod off overkill until that's root-caused; remove once
+      # confirmed fixed. Every pod scheduled there hits an identical, 100%
+      # reproducible timeout dialing out to the Gateway VIP
+      # (192.168.1.240:443) from the pod network namespace specifically —
+      # confirmed via nsenter into a live pod's netns: the same connection
+      # from the *host* netns on overkill works instantly, and the same
+      # pod-netns test from pi1 works instantly too. Ruled out: stale
+      # iptables masquerade rule (it's a dynamic `-j MASQUERADE`, not
+      # pinned to overkill's old LAN IP), Cilium agent health (82/82
+      # controllers healthy, no eBPF drops observed live), and a Cilium
+      # agent restart (tried — a fresh agent + a brand-new pod created
+      # after it still reproduces the same timeout). First surfaced right
+      # after overkill's LAN IP changed (192.168.1.210 -> .211), but the
+      # root cause is still open — see git log around 2026-09-01 for the
+      # investigation. Gatus panics hard on OIDC discovery failure at
+      # startup (no retry), so it crash-loops indefinitely if scheduled
+      # here instead of just running degraded.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - overkill
       containers:
         - name: gatus
           image: ghcr.io/twin/gatus:stable
