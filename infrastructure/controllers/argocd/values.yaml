@@ -18,6 +18,22 @@ configs:
             "authelia-crypto", "authelia-oidc-client", "authelia-users",
             "oauth2-proxy-credentials", "tailscale-authkey", "headplane-credentials"
           ] | any($n == .)) | .data
+    # Cilium's Gateway API controller normalizes objects by filling in default
+    # group/kind fields (parentRefs, backendRefs, allowedRoutes.kinds,
+    # certificateRefs) and defaulting weight to 1. These are API defaults, not
+    # user intent, so ignore them to prevent perpetual OutOfSync.
+    resource.customizations.ignoreDifferences.gateway.networking.k8s.io_Gateway: |
+      jqExpressionRules:
+        - expression: del(.spec.listeners[].allowedRoutes.kinds[].group) | del(.spec.listeners[].tls.certificateRefs[].group, .spec.listeners[].tls.certificateRefs[].kind)
+          compare: json
+    resource.customizations.ignoreDifferences.gateway.networking.k8s.io_HTTPRoute: |
+      jqExpressionRules:
+        - expression: del(.spec.parentRefs[].group, .spec.parentRefs[].kind) | del(.spec.rules[].backendRefs[].group, .spec.rules[].backendRefs[].kind) | del(.spec.rules[].backendRefs[].weight)
+          compare: json
+    resource.customizations.ignoreDifferences.gateway.networking.k8s.io_TLSRoute: |
+      jqExpressionRules:
+        - expression: del(.spec.parentRefs[].group, .spec.parentRefs[].kind) | del(.spec.rules[].backendRefs[].group, .spec.rules[].backendRefs[].kind) | del(.spec.rules[].backendRefs[].weight)
+          compare: json
   cmp:
     create: true
     plugins:
