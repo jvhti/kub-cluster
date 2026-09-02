@@ -42,11 +42,18 @@ spec:
               value: "4443"
             - name: DEGOOG_MCP_DEGOOG_URL
               value: http://degoog:4444
-            # Optional tuning (see upstream mcp.yml for what each does):
-            # DEGOOG_MCP_MAX_RESULTS, DEGOOG_MCP_SEARCH_TEXT,
-            # DEGOOG_MCP_ENGINES. DEGOOG_MCP_DEGOOG_API_KEY is only needed if
-            # degoog's own API-key protection is enabled - it isn't on this
-            # instance (no such env on the degoog Deployment).
+            # Small-model tuning (the main MCP client is opencode on a local
+            # 27B Qwen): "results" puts titles/URLs/snippets in the visible
+            # tool text instead of the default "full" breakdown, and caps
+            # merged results at 10 - keeps responses within a limited
+            # context window. See upstream mcp.yml for what each does.
+            # DEGOOG_MCP_ENGINES (restrict to specific engine ids) and
+            # DEGOOG_MCP_DEGOOG_API_KEY (only if degoog's API-key protection
+            # is enabled - it isn't) remain unset.
+            - name: DEGOOG_MCP_SEARCH_TEXT
+              value: "results"
+            - name: DEGOOG_MCP_MAX_RESULTS
+              value: "10"
           ports:
             - containerPort: 4443
           # tcpSocket, not httpGet: /mcp is a streamable-HTTP MCP endpoint,
