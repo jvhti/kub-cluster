@@ -5,8 +5,9 @@ metadata:
 spec:
   # Same reasoning as gateway-lan-pool (infrastructure/networking/gateway/
   # ip-pool.yaml): needs a VIP actually inside the LAN broadcast domain
-  # (192.168.1.0/24) for L2 announcement/ARP to reach the router, since
-  # main-pool's 10.2.0.0/16 isn't on the same subnet.
+  # (192.168.1.0/24), since main-pool's 10.2.0.0/16 is unreachable by the
+  # router. L2-announce is disabled; .241 is a static secondary IP on
+  # kub-ctrl-1's ens18 (see CLAUDE.md "Node-local state").
   blocks:
     - start: "192.168.1.241"
       stop: "192.168.1.241" # Single IP, right after gateway-internal's .240

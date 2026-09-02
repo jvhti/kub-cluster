@@ -4,13 +4,14 @@ metadata:
   name: gateway-lan-pool
 spec:
   # main-pool (10.2.0.0/16, see infrastructure/networking/cilium/ip-pool.yaml)
-  # is not on the same broadcast domain as the LAN (192.168.1.0/24), so L2
-  # announcement/ARP for it never reaches the router — nothing outside the
-  # cluster nodes themselves can resolve or route to it. gateway-internal
-  # needs a VIP actually inside 192.168.1.0/24 so the router's DMZ/port
-  # forward can reach it. Scoped via serviceSelector to only this Gateway's
-  # generated Service, so it doesn't affect anything else drawing from
-  # main-pool.
+  # is not on the same broadcast domain as the LAN (192.168.1.0/24), so the
+  # router/DMZ can never resolve or route to it. gateway-internal needs a VIP
+  # actually inside 192.168.1.0/24. L2-announce is DISABLED (cilium
+  # values.yaml); .240 is a static secondary IP on kub-ctrl-1's ens18 instead
+  # (see CLAUDE.md "Node-local state") so the kernel answers ARP for it — no
+  # lease re-election, no wrong-node/wrong-interface flapping. Scoped via
+  # serviceSelector to only this Gateway's generated Service, so it doesn't
+  # affect anything else drawing from main-pool.
   blocks:
     - start: "192.168.1.240"
       stop: "192.168.1.240" # Single IP - gateway-internal only ever needs the one it's pinned to (gateway.yaml). Was a wider range (.240-.250); shrunk to stop overlapping infrastructure/controllers/headscale/ip-pool.yaml's .241 - Cilium rejects overlapping CiliumLoadBalancerIPPool ranges outright regardless of disjoint serviceSelectors (confirmed live: PoolConflict/cidr_overlap, left gateway-headscale's Service stuck <pending> and its Gateway "Address not ready yet"). Verify against your router's DHCP pool if this or headscale's .241 ever needs to move.

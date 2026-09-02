@@ -24,7 +24,7 @@ spec:
   gatewayClassName: cilium
   addresses:
     - type: IPAddress
-      value: 192.168.1.240 # Pinned so the router port-forward/DMZ target doesn't need to change if the Service is recreated. Must be inside gateway-lan-pool's range (ip-pool.yaml in this dir) — deliberately on the LAN subnet (192.168.1.0/24) rather than main-pool's 10.2.0.0/16, since L2 announcement/ARP for an off-subnet VIP never reaches the router.
+      value: 192.168.1.240 # Pinned so the router port-forward/DMZ target doesn't need to change if the Service is recreated. Must be inside gateway-lan-pool's range (ip-pool.yaml in this dir) — deliberately on the LAN subnet (192.168.1.0/24) rather than main-pool's 10.2.0.0/16, since an off-subnet VIP is unreachable by the router. L2-announce is disabled; .240 is a static secondary IP on kub-ctrl-1's ens18 (see CLAUDE.md "Node-local state").
   listeners:
     - name: http
       port: 80
