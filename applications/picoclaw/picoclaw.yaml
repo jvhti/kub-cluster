@@ -1,0 +1,137 @@
+# PicoClaw (https://github.com/sipeed/picoclaw, https://docs.picoclaw.io) —
+# small personal AI agent/gateway. This is the `-launcher` image variant:
+# its entrypoint is already `picoclaw-launcher -console -public -no-browser`,
+# which serves the browser web console on :18800 AND auto-starts the gateway
+# as a child process on :18790 (health at /health, readiness at /ready,
+# both on :18790) — so no command override here, and the probes below all
+# hit the gateway port, not the console port.
+#
+# Security (accepted caveat): PicoClaw is pre-1.0, upstream warns about
+# unresolved security issues, and CISA listed a PicoClaw vuln in Jul 2026.
+# This is public (picoclaw.jvos.dev — see httproute.yaml) but mitigated by
+# the Authelia (2FA) login gate in front of it (oauth2-proxy-picoclaw) plus
+# the launcher's own dashboard password (set on first run at /launcher-
+# setup) as a second factor. The launcher also has a built-in allowed_cidrs
+# option if IP-restriction is ever wanted on top of that.
+#
+# No imperative Secrets for first sync: everything user-configured (LLM
+# model_list, Telegram bot token, dashboard password) lives on the PVC at
+# /root/.picoclaw, not in env vars.
+#
+# Post-deploy setup (browser, after the Authelia login):
+#   1. https://picoclaw.jvos.dev -> /launcher-setup -> set dashboard password
+#   2. Add the two homelab llama.cpp endpoints (OpenAI-compatible mode, no
+#      API key needed) to config.json's model_list — exact entries:
+#      {
+#        "model_list": [
+#          { "model_name": "qwen3.8-27b", "model": "openai/qwen3.8-27b",
+#            "api_base": "http://192.168.1.211:8090/v1" },
+#          { "model_name": "qwen3-8b", "model": "openai/qwen3-8b",
+#            "api_base": "http://192.168.1.18:8080/v1" }
+#        ]
+#      }
+#      (model ids must match the llama-server router preset section names;
+#      192.168.1.211 is `overkill`'s static LAN IP, 192.168.1.18 is the
+#      Proxmox LXC's DHCP lease — confirm it hasn't moved first; full
+#      details in docs/local-llm-setups.md)
+#   3. Add the Telegram bot token in the console -> chat. Telegram is
+#      outbound long-polling from the pod, no inbound route needed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: picoclaw
+  namespace: picoclaw
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # RWO Longhorn data PVC — a RollingUpdate would try to attach it to two pods at once
+  selector:
+    matchLabels:
+      app: picoclaw
+  template:
+    metadata:
+      labels:
+        app: picoclaw
+    spec:
+      # Keep off overkill until its pod-networking bug is root-caused (same
+      # as applications/gatus/gatus.yaml's nodeAffinity): pods scheduled
+      # there 100% reproducibly time out dialing the Gateway VIP from the
+      # pod netns, and the oauth2-proxy in front of this app needs exactly
+      # that path for OIDC discovery (see
+      # infrastructure/controllers/oauth2-proxy-picoclaw/kustomization.yaml's
+      # own patch for the same reason).
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - overkill
+      containers:
+        - name: picoclaw
+          image: docker.io/sipeed/picoclaw:v0.3.1-launcher
+          # No command/args override — the image entrypoint is already
+          # `picoclaw-launcher -console -public -no-browser` (see header).
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+          ports:
+            - containerPort: 18800 # launcher web console
+            - containerPort: 18790 # gateway (health/ready + channel webhooks)
+          # Gateway takes a moment after the launcher itself is up, so a
+          # startup probe gates the readiness/liveness pair until it answers.
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: 18790
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 18790
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 18790
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: data
+              mountPath: /root/.picoclaw
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: picoclaw-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: picoclaw
+  namespace: picoclaw
+spec:
+  selector:
+    app: picoclaw
+  ports:
+    # 18790 is exposed for completeness/future channel-webhook use only —
+    # the gateway binds 127.0.0.1 by default (PICOCLAW_GATEWAY_HOST unset),
+    # so cross-pod traffic to it would need that env var set to 0.0.0.0
+    # first. Nothing inbound uses it today (Telegram is outbound
+    # long-polling).
+    - name: console
+      port: 18800
+      targetPort: 18800
+    - name: gateway
+      port: 18790
+      targetPort: 18790

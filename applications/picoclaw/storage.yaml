@@ -1,0 +1,17 @@
+# PicoClaw's ~/.picoclaw data dir (config.json, .security.yml credential
+# store, workspace, and the dashboard-password DB) on Longhorn. Everything
+# user-configured in the web console lands here, so the PVC is what makes
+# first-run setup survive pod restarts/redeploys — see picoclaw.yaml's
+# header comment for why no imperative Secrets are needed instead.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: picoclaw-data
+  namespace: picoclaw
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi

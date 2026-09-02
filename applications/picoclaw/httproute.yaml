@@ -1,0 +1,33 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: picoclaw
+  namespace: picoclaw
+spec:
+  parentRefs:
+    - name: gateway-internal
+      namespace: gateway
+      sectionName: https
+  hostnames:
+    - "picoclaw.jvos.dev"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        # Routes through the picoclaw-dedicated oauth2-proxy instance
+        # instead of straight to the picoclaw Service — PicoClaw is
+        # internet-exposed and pre-1.0 with known security caveats (see
+        # picoclaw.yaml's header comment), so it gets the same
+        # Authelia-backed login gate as Longhorn/degoog. A SEPARATE
+        # oauth2-proxy instance, not shared — one instance per app is
+        # required (single-upstream, single-redirect-url legacy CLI
+        # config), see docs/oauth2-proxy-authelia.md for the full why.
+        # Needs the ReferenceGrant in
+        # infrastructure/controllers/oauth2-proxy-picoclaw/ (cross-namespace
+        # backendRef).
+        - name: oauth2-proxy-picoclaw
+          namespace: oauth2-proxy-picoclaw
+          port: 80
+          weight: 1

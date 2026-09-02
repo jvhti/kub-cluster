@@ -1,0 +1,23 @@
+# Another per-app oauth2-proxy instance, dedicated to PicoClaw — NOT a
+# shared/multi-host proxy. Same "one instance per app" constraint as the
+# other instances here (single-upstream, single-redirect-url legacy CLI
+# config): see infrastructure/controllers/oauth2-proxy-degoog/values.yaml's
+# header comment and docs/oauth2-proxy-authelia.md for the full why.
+#
+# See infrastructure/controllers/oauth2-proxy-picoclaw/secrets.yaml for how
+# config.existingSecret's keys get their real values.
+
+config:
+  existingSecret: oauth2-proxy-picoclaw-credentials
+
+extraArgs:
+  provider: oidc
+  oidc-issuer-url: https://auth.jvos.dev
+  redirect-url: https://picoclaw.jvos.dev/oauth2/callback
+  email-domain: "*"
+  cookie-domain: .jvos.dev
+  whitelist-domain: .jvos.dev
+  reverse-proxy: "true"
+  set-xauthrequest: "true"
+  cookie-expire: 168h
+  upstream: http://picoclaw.picoclaw.svc.cluster.local:18800

@@ -104,6 +104,12 @@ pod:
         items:
           - key: client-secret-hash
             path: client-secret-hash.txt
+    - name: oidc-client-secret-picoclaw
+      secret:
+        secretName: authelia-oidc-client-picoclaw
+        items:
+          - key: client-secret-hash
+            path: client-secret-hash.txt
   extraVolumeMounts:
     - name: users-database
       mountPath: /config/users_database.yml
@@ -147,6 +153,10 @@ pod:
       readOnly: true
     - name: oidc-client-secret-excalidash
       mountPath: /secrets/client-secret-hash-excalidash.txt
+      subPath: client-secret-hash.txt
+      readOnly: true
+    - name: oidc-client-secret-picoclaw
+      mountPath: /secrets/client-secret-hash-picoclaw.txt
       subPath: client-secret-hash.txt
       readOnly: true
 
@@ -429,6 +439,25 @@ configMap:
             - 'authorization_code'
           response_types:
             - 'code'
+        - client_id: 'oauth2-proxy-picoclaw'
+          client_name: 'oauth2-proxy (PicoClaw)'
+          client_secret:
+            path: '/secrets/client-secret-hash-picoclaw.txt'
+          public: false
+          authorization_policy: 'one_factor'
+          redirect_uris:
+            - 'https://picoclaw.jvos.dev/oauth2/callback'
+          scopes:
+            - 'openid'
+            - 'profile'
+            - 'email'
+            - 'groups'
+          grant_types:
+            - 'authorization_code'
+          response_types:
+            - 'code'
+          # NOT setting token_endpoint_auth_method — see Learning #1 in
+          # docs/oauth2-proxy-authelia.md.
 
 ingress:
   # Top-level master switch, separate from gatewayAPI.enabled below — chart
