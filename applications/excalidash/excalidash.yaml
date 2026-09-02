@@ -33,8 +33,25 @@ spec:
   template:
     metadata:
       labels:
-        app: excalidash-backend
+          app: excalidash-backend
     spec:
+      # Keep off overkill until its pod-networking bug is root-caused (same
+      # workaround as gatus/rustypaste — see their matching affinity blocks):
+      # any pod scheduled there 100% reproducibly times out dialing the
+      # Gateway VIP (192.168.1.240:443) from the pod netns, while the
+      # identical connection from the host netns on that same node works.
+      # The backend dials auth.jvos.dev for OIDC discovery, which in-cluster
+      # resolves to that VIP via coredns-custom, so if it lands on overkill
+      # startup discovery hangs and the pod never becomes useful.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - overkill
       containers:
         - name: backend
           image: zimengxiong/excalidash-backend:0.6.0
@@ -157,8 +174,21 @@ spec:
   template:
     metadata:
       labels:
-        app: excalidash-frontend
+          app: excalidash-frontend
     spec:
+      # Keep off overkill too: same known pod-networking bug — a pod there is
+      # unreachable cross-node, which breaks the gateway→Service→pod client
+      # path even though node-local probes read healthy (see rustypaste.yaml /
+      # gatus.yaml for the full notes).
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - overkill
       containers:
         - name: frontend
           image: zimengxiong/excalidash-frontend:0.6.0
