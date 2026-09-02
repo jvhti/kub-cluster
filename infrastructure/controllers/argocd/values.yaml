@@ -25,6 +25,166 @@ configs:
     # - backendRefs: controller adds group + kind + weight
     # - Gateway listeners: controller adds group to allowedRoutes.kinds and
     #   group+kind to tls.certificateRefs
+    # StatefulSet + server-side apply + API-server defaulting is a known
+    # ArgoCD perpetual-OutOfSync loop (argoproj/argo-cd#11143): the gitea and
+    # actions-runner charts render these three StatefulSets without their
+    # default values, but the API server fills those defaults into the live
+    # object at apply time (revisionHistoryLimit, dnsPolicy,
+    # terminationMessagePath, probe fields, ...), and SSA can never remove
+    # them - auto-heal re-applies forever without converging (the valkey one
+    # had accumulated 40+ auto-heal attempts). Each path below is the exact
+    # drift observed between the rendered target and the live object, and
+    # every expression was validated against the real manifests with gojq,
+    # the engine ArgoCD evaluates them with. The subPath expression only
+    # strips null subPaths (a chart-rendering artifact), so real subPath
+    # values still drift-detect. Scoped by name like the Secret rule above,
+    # so every other StatefulSet keeps normal drift detection.
+    resource.customizations.ignoreDifferences.apps_StatefulSet: |
+      jqPathExpressions:
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.persistentVolumeClaimRetentionPolicy
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.podManagementPolicy
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.revisionHistoryLimit
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.serviceName
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.updateStrategy
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.affinity.nodeAffinity
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.affinity.podAffinity
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.dnsPolicy
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.hostNetwork
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.restartPolicy
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.schedulerName
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.securityContext
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.serviceAccount
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.terminationGracePeriodSeconds
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.containers[].env[].valueFrom.fieldRef.apiVersion
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.containers[].ports[]?.protocol
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.containers[].terminationMessagePath
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.containers[].terminationMessagePolicy
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.containers[].volumeMounts[] | select(.subPath == null) | .subPath
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.initContainers[]?.imagePullPolicy
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.initContainers[]?.resources
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.initContainers[]?.terminationMessagePath
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.initContainers[]?.terminationMessagePolicy
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.initContainers[]?.livenessProbe.failureThreshold
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.initContainers[]?.livenessProbe.periodSeconds
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.initContainers[]?.livenessProbe.successThreshold
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.initContainers[]?.livenessProbe.timeoutSeconds
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.initContainers[]?.startupProbe.failureThreshold
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.initContainers[]?.startupProbe.periodSeconds
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.initContainers[]?.startupProbe.successThreshold
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.initContainers[]?.startupProbe.timeoutSeconds
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.template.spec.volumes[].configMap.defaultMode
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.volumeClaimTemplates[].apiVersion
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.volumeClaimTemplates[].kind
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.volumeClaimTemplates[].spec.volumeMode
+        - >-
+          select(.metadata.name as $n | [
+            "gitea-valkey-cluster", "gitea-runner-amd64-runner", "gitea-runner-arm64-runner"
+          ] | any($n == .)) | .spec.volumeClaimTemplates[].status
     resource.customizations.ignoreDifferences.gateway.networking.k8s.io_Gateway: |
       jqPathExpressions:
         - .spec.listeners[].allowedRoutes.kinds
