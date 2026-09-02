@@ -19,6 +19,6 @@ extraArgs:
   cookie-domain: .jvos.dev
   whitelist-domain: .jvos.dev
   reverse-proxy: "true"
-   set-xauthrequest: "true"
-   cookie-max-age: "604800"
-   upstream: http://memos.memos.svc.cluster.local:5230
+  set-xauthrequest: "true"
+  cookie-max-age: "604800"
+  upstream: http://memos.memos.svc.cluster.local:5230
