@@ -1,0 +1,65 @@
+# rustypaste's config.toml (https://github.com/orhun/rustypaste/blob/master/config.toml).
+# Mounted at /config and pointed at via the CONFIG env var; [config]
+# refresh_rate = "1s" makes rustypaste re-read this file every second, so
+# editing this ConfigMap hot-applies within a kubelet sync period (~1min) — no
+# `kubectl rollout restart` needed, unlike the gatus deployment.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rustypaste-config
+  namespace: rustypaste
+data:
+  config.toml: |
+    [config]
+    refresh_rate = "1s"
+
+    [server]
+    # 0.0.0.0 so it's reachable from the pod network (the image's default env
+    # SERVER__ADDRESS is already 0.0.0.0:8000; stated here explicitly so a
+    # missing env never silently binds loopback-only).
+    address = "0.0.0.0:8000"
+    # Base URL used to build the links returned after an upload — must be the
+    # public hostname or uploads hand back internal addresses.
+    url = "https://paste.jvos.dev"
+    max_content_length = "10MB"
+    upload_path = "/app/upload"
+    timeout = "30s"
+    expose_version = false
+    # Keep the JSON /list endpoint off — it would expose every stored filename
+    # to anyone who can hit the host.
+    expose_list = false
+    handle_spaces = "replace"
+
+    [landing_page]
+    content_type = "text/plain; charset=utf-8"
+    text = "rustypaste - a minimal file upload / pastebin\n\nUpload a file:\n    curl -F 'file=@example.txt' https://paste.jvos.dev\nThis returns the URL of the uploaded file.\n\nPastes expire after 72 hours.\nhttps://github.com/orhun/rustypaste"
+
+    [paste]
+    random_url = { type = "petname", words = 2, separator = "-" }
+    default_extension = "txt"
+    # MIME type forced per filename regex; keeps code/text served as
+    # text/plain so nothing in a paste can execute in a browser.
+    mime_override = [
+      { mime = "image/jpeg", regex = "^.*\\.jpg$" },
+      { mime = "image/png", regex = "^.*\\.png$" },
+      { mime = "text/plain", regex = "^.*\\.(log|txt|diff|sh|rs|toml)$" },
+    ]
+    # Block obviously-useful-to-attackers uploads.
+    mime_blacklist = [
+      "application/x-dosexec",
+      "application/java-archive",
+      "application/java-vm",
+      "audio/",
+    ]
+    # Serve these detected content-types as plaintext too.
+    text_mime_overrides = [
+      "application/toml",
+      "application/yaml",
+      "application/x-yaml",
+    ]
+    duplicate_files = true
+    # Self-cleaning: every paste expires 3 days out and the built-in janitor
+    # removes it, so the Longhorn volume stays bounded without any manual
+    # DELETE calls. Drop this line if you want pastes to persist indefinitely.
+    default_expiry = "72h"
+    delete_expired_files = { enabled = true, interval = "1h" }

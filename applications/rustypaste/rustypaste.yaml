@@ -1,0 +1,93 @@
+# rustypaste (https://github.com/orhun/rustypaste) — a minimal, single-binary
+# file upload / pastebin service. No database; the Longhorn volume below is
+# the store. Public (no oauth2-proxy / Authelia gate) on purpose, same call as
+# immich: a pastebin's whole point is that the returned per-file URL is
+# shareable by anyone who has it, so a login in front of the download path
+# would defeat the purpose. Access control is by obscurity (random 2-word
+# petname URLs) + the 72h auto-expiry in config.yaml.
+#
+# To enable the admin DELETE endpoint later (removing a file before it
+# expires): create a Secret with a newline-separated token list, then mount it
+# and set the DELETE_TOKENS_FILE env var (see
+# https://github.com/orhun/rustypaste#delete-file-from-server). Deliberately
+# not done here so the first sync has no imperative secret prerequisite to
+# leave the pod stuck in ContainerCreating.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rustypaste
+  namespace: rustypaste
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: rustypaste
+  template:
+    metadata:
+      labels:
+        app: rustypaste
+    spec:
+      # The official image is FROM scratch and ships as USER 1000:1000, but it
+      # writes every uploaded file into the Longhorn RWO volume below, which
+      # kubelet mounts root-owned (Longhorn's CSI driver does not apply
+      # fsGroup to its volumes). Running as root is the reliable way to make a
+      # freshly-provisioned RWO volume writable with no chown/fsGroup dance;
+      # the blast radius is confined to this pod's private volume.
+      securityContext:
+        runAsUser: 0
+      containers:
+        - name: rustypaste
+          image: orhunp/rustypaste:0.18.0
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: CONFIG
+              value: /config/config.toml
+            - name: RUST_LOG
+              value: info
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: upload
+              mountPath: /app/upload
+          # GET / returns the plain-text landing page (HTTP 200) once the
+          # server is listening, so it doubles as a ready/live check —
+          # rustypaste has no dedicated /health route.
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 5
+      volumes:
+        - name: config
+          configMap:
+            name: rustypaste-config
+        - name: upload
+          persistentVolumeClaim:
+            claimName: rustypaste-uploads
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rustypaste
+  namespace: rustypaste
+spec:
+  selector:
+    app: rustypaste
+  ports:
+    - port: 8000
+      targetPort: 8000

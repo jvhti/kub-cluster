@@ -1,0 +1,19 @@
+# Uploaded files live here on Longhorn. rustypaste has no database — the
+# filesystem IS the store — so this PVC is the only persistent state. Sized
+# modestly on purpose: with [paste].default_expiry = "72h" +
+# delete_expired_files enabled (see config.yaml) every paste self-cleans after
+# 3 days, so this volume does not grow unbounded the way immich/memos' bulk
+# media (kept forever on TrueNAS NFS) does. RWO + single replica is all a
+# pastebin needs.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rustypaste-uploads
+  namespace: rustypaste
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi
