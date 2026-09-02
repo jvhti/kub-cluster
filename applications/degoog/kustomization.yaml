@@ -10,3 +10,5 @@ resources:
   - valkey.yaml
   - degoog.yaml
   - httproute.yaml
+  - mcp.yaml
+  - mcp-httproute.yaml

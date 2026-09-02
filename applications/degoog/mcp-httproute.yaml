@@ -1,0 +1,42 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: degoog-mcp
+  namespace: degoog
+  annotations:
+    # LAN-only hostname: external-dns (Cloudflare, policy: sync) watches
+    # every HTTPRoute on gateway-internal and would publish a public A record
+    # without this - and the MCP endpoint has no auth of its own, so going
+    # public would expose the search aggregator to the internet. Skip public
+    # DNS; LAN clients resolve this via the Technitium split-horizon zone
+    # (infrastructure/dns-technitium/README.md) and pods via coredns-custom,
+    # both pointing at gateway-internal's VIP like every other entry.
+    external-dns.k8s.io/ignore: "true"
+spec:
+  parentRefs:
+    - name: gateway-internal
+      namespace: gateway
+      sectionName: https
+  hostnames:
+    - "search-mcp.jvos.dev"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        # Straight to the MCP Service - deliberately NOT through an
+        # oauth2-proxy instance. The usual public-app pattern (dedicated
+        # oauth2-proxy + Authelia OIDC client per hostname, see
+        # infrastructure/controllers/oauth2-proxy-degoog/) doesn't fit MCP:
+        # clients like Claude Desktop/Cursor can't do the browser-redirect
+        # login flow against a /mcp endpoint. Accepted trade-off (user
+        # decision): anyone who knows this hostname can hit the WAN IP
+        # directly with SNI search-mcp.jvos.dev and reach it (DMZ-forwarder
+        # LXC -> gateway-internal) even without a public DNS record - it's
+        # DNS-privacy only, not a real access control. Fine because the
+        # endpoint only proxies degoog's search API, same data the public
+        # (Authelia-gated) web UI at search.jvos.dev already serves.
+        - name: degoog-mcp
+          port: 4443
+          weight: 1
