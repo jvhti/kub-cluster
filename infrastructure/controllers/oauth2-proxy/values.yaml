@@ -27,7 +27,8 @@ extraArgs:
   whitelist-domain: .jvos.dev
   reverse-proxy: "true" # Sits behind Cilium's Envoy Gateway — needed so X-Forwarded-* headers are honored correctly.
   set-xauthrequest: "true"
-  # Default is 43200s (12h); bumped to 7d so the proxy's own session outlives
-  # a full week — the Authelia session (1 year) is the real ceiling now.
-  cookie-max-age: "604800"
+  # --cookie-expire (default is already 168h) — set explicitly so the proxy's
+  # session lifetime stays a full week even if the upstream default changes;
+  # the Authelia session (1 year) is the real ceiling.
+  cookie-expire: 168h
   upstream: http://longhorn-frontend.longhorn-system.svc.cluster.local:80

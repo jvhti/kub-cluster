@@ -26,5 +26,5 @@ extraArgs:
   whitelist-domain: .jvos.dev
   reverse-proxy: "true"
   set-xauthrequest: "true"
-  cookie-max-age: "604800"
+  cookie-expire: 168h
   upstream: http://degoog.degoog.svc.cluster.local:4444
