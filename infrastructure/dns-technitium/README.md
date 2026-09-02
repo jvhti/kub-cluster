@@ -79,6 +79,7 @@ block — same set of hostnames, same targets.
 | `start.jvos.dev` | `192.168.1.240` |
 | `chat.jvos.dev` | `192.168.1.240` |
 | `status.jvos.dev` | `192.168.1.240` |
+| `draw.jvos.dev` | `192.168.1.240` |
 | `headscale.jvos.dev` | `192.168.1.241` |
 
 ## Adding a new hostname later

@@ -98,6 +98,12 @@ pod:
         items:
           - key: client-secret-hash
             path: client-secret-hash.txt
+    - name: oidc-client-secret-excalidash
+      secret:
+        secretName: authelia-oidc-client-excalidash
+        items:
+          - key: client-secret-hash
+            path: client-secret-hash.txt
   extraVolumeMounts:
     - name: users-database
       mountPath: /config/users_database.yml
@@ -137,6 +143,10 @@ pod:
       readOnly: true
     - name: oidc-client-secret-gatus
       mountPath: /secrets/client-secret-hash-gatus.txt
+      subPath: client-secret-hash.txt
+      readOnly: true
+    - name: oidc-client-secret-excalidash
+      mountPath: /secrets/client-secret-hash-excalidash.txt
       subPath: client-secret-hash.txt
       readOnly: true
 
@@ -385,6 +395,31 @@ configMap:
             # with /authorization-code/callback"), not oauth2-proxy's
             # /oauth2/callback used by every other client here.
             - 'https://status.jvos.dev/authorization-code/callback'
+          scopes:
+            - 'openid'
+            - 'profile'
+            - 'email'
+            - 'groups'
+          grant_types:
+            - 'authorization_code'
+          response_types:
+            - 'code'
+        - client_id: 'excalidash'
+          client_name: 'ExcaliDash'
+          client_secret:
+            path: '/secrets/client-secret-hash-excalidash.txt'
+          public: false
+          authorization_policy: 'one_factor'
+          redirect_uris:
+            # Not an oauth2-proxy instance — ExcaliDash has native OIDC
+            # (AUTH_MODE=oidc_enforced), authenticating straight against
+            # Authelia (see applications/excalidash/excalidash.yaml's
+            # OIDC_* env vars). Same reasoning as Homarr/Open WebUI/Gatus.
+            # Path is ExcaliDash's own fixed callback route (confirmed
+            # against its backend/src/auth/oidcCallbackRoute.ts), not
+            # oauth2-proxy's /oauth2/callback used by every other client
+            # here.
+            - 'https://draw.jvos.dev/api/auth/oidc/callback'
           scopes:
             - 'openid'
             - 'profile'

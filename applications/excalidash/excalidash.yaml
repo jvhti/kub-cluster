@@ -1,0 +1,213 @@
+# ExcaliDash (https://excalidash.xyz / github.com/ZimengXiong/ExcaliDash) —
+# self-hosted Excalidraw dashboard/organizer with persistent storage, version
+# history, and real-time multi-user collaboration. Two Deployments, mirroring
+# the app's own docker-compose.prod.yml split:
+#   frontend — nginx, serves the SPA and proxies /api/ + /socket.io/ (the
+#              Socket.IO live-collab websocket) to the backend. All browser
+#              traffic, including websockets, goes through this container;
+#              the HTTPRoute only ever points at it.
+#   backend  — Express API + Socket.IO server on :8000, talks to
+#              excalidash-postgres (postgres-cluster.yaml, CNPG).
+#
+# Auth: ExcaliDash has NATIVE OIDC support (AUTH_MODE=oidc_enforced), so
+# unlike memos/degoog/longhorn it does NOT sit behind a dedicated
+# oauth2-proxy instance — it's its own Authelia OIDC client (see
+# infrastructure/controllers/authelia/values.yaml's "excalidash" client
+# entry), same pattern as Homarr/Open WebUI/Gatus. The app's OIDC callback
+# (backend/src/auth/oidcCallbackRoute.ts) already auto-falls-back to the
+# userinfo endpoint when the ID token lacks `email`, so Authelia v4.39+'s
+# spec-minimal ID tokens (the issue that required Homarr's
+# AUTH_OIDC_FORCE_USERINFO) are handled natively. OIDC_FIRST_USER_ADMIN
+# defaults to true, so the first user to log in via Authelia is auto-created
+# as ADMIN — no bootstrap chicken-and-egg.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: excalidash-backend
+  namespace: excalidash
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: excalidash-backend
+  template:
+    metadata:
+      labels:
+        app: excalidash-backend
+    spec:
+      containers:
+        - name: backend
+          image: zimengxiong/excalidash-backend:0.6.0
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            - name: PORT
+              value: "8000"
+            - name: NODE_ENV
+              value: production
+            - name: DATABASE_PROVIDER
+              value: postgresql
+            # CNPG auto-creates excalidash-postgres-app (app role) when the
+            # Cluster boots — same pattern as memos. EXCALIDASH_DBUSER/
+            # EXCALIDASH_DBPASS must be defined before DATABASE_URL below —
+            # Kubernetes only resolves a $(VAR) reference against env vars
+            # defined earlier in this same list, in order.
+            - name: EXCALIDASH_DBUSER
+              valueFrom:
+                secretKeyRef:
+                  name: excalidash-postgres-app
+                  key: username
+            - name: EXCALIDASH_DBPASS
+              valueFrom:
+                secretKeyRef:
+                  name: excalidash-postgres-app
+                  key: password
+            # No sslmode/sslaccept param needed — the CNPG Cluster here
+            # doesn't configure TLS, same as memos'/degoog's Postgres.
+            - name: DATABASE_URL
+              value: postgresql://$(EXCALIDASH_DBUSER):$(EXCALIDASH_DBPASS)@excalidash-postgres-rw:5432/excalidash
+            - name: AUTH_MODE
+              value: oidc_enforced
+            - name: OIDC_PROVIDER_NAME
+              value: Authelia
+            # Browser-routable public issuer, kept exactly as the public URL
+            # for issuer validation + browser redirects. No separate
+            # OIDC_DISCOVERY_URL needed: in-cluster, auth.jvos.dev resolves
+            # straight to the internal Gateway VIP via
+            # infrastructure/networking/coredns-custom (see that dir's
+            # comment), so the backend reaches .well-known fine.
+            - name: OIDC_ISSUER_URL
+              value: https://auth.jvos.dev
+            - name: OIDC_CLIENT_ID
+              value: excalidash
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: excalidash-secrets
+                  key: oidc-client-secret
+            # ExcaliDash's own fixed callback route (confirmed against
+            # backend/src/auth/oidcCallbackRoute.ts), not an oauth2-proxy
+            # /oauth2/callback.
+            - name: OIDC_REDIRECT_URI
+              value: https://draw.jvos.dev/api/auth/oidc/callback
+            - name: OIDC_SCOPES
+              value: "openid profile email groups"
+            # Authelia v4.39+ (running here: v4.39.x) emits spec-minimal ID
+            # tokens (see homarr.yaml's AUTH_OIDC_FORCE_USERINFO comment for
+            # the full context) and may omit `email_verified` — ExcaliDash
+            # reads that claim ONLY from the signed ID token (never the
+            # unsigned userinfo response, by design), so without this it
+            # would reject every login with `unverified_email`. Upstream's
+            # own docs recommend false for trusted internal IdPs that don't
+            # emit the claim. Safe to flip back to true once confirmed
+            # Authelia emits email_verified=true in the ID token here.
+            - name: OIDC_REQUIRE_EMAIL_VERIFIED
+              value: "false"
+            # Allowed frontend origin(s) for API origin checks + callback
+            # handling — must match the public URL exactly.
+            - name: FRONTEND_URL
+              value: https://draw.jvos.dev
+            # Exactly one trusted reverse-proxy hop: the frontend nginx
+            # (which preserves X-Forwarded-Proto from the Gateway and
+            # forwards it to the backend — see the image's
+            # nginx.conf.template map block).
+            - name: TRUST_PROXY
+              value: "1"
+            # Fixed, not auto-generated-and-persisted-in-volume: with
+            # Postgres (no local backend volume) there's nowhere for the
+            # app's own single-instance persistence to live anyway, and a
+            # stable secret keeps sessions valid across pod reschedules.
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: excalidash-secrets
+                  key: jwt-secret
+            - name: CSRF_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: excalidash-secrets
+                  key: csrf-secret
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: excalidash-frontend
+  namespace: excalidash
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: excalidash-frontend
+  template:
+    metadata:
+      labels:
+        app: excalidash-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: zimengxiong/excalidash-frontend:0.6.0
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            # The image's entrypoint substitutes this into
+            # nginx.conf.template's /api/ and /socket.io/ proxy_pass — the
+            # default (backend:8000) only works in docker-compose's own
+            # network, not here.
+            - name: BACKEND_URL
+              value: excalidash-backend.excalidash.svc.cluster.local:8000
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: excalidash-backend
+  namespace: excalidash
+spec:
+  selector:
+    app: excalidash-backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: excalidash-frontend
+  namespace: excalidash
+spec:
+  selector:
+    app: excalidash-frontend
+  ports:
+    - port: 80
+      targetPort: 80

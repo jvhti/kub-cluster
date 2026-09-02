@@ -1,0 +1,26 @@
+# ExcaliDash's own Postgres, via CloudNativePG — same pattern as
+# applications/memos/postgres-cluster.yaml and
+# applications/degoog/postgres-cluster.yaml. Single instance, no HA, homelab
+# scale. Used instead of ExcaliDash's default SQLite specifically because
+# drawing images are stored as blobs in the database (no S3/MinIO exists in
+# this cluster), so the DB is the app's only state and its main growth
+# driver — Postgres handles that better than a single SQLite file, and CNPG
+# gives scheduled backups for free. CNPG auto-creates the
+# excalidash-postgres-app Secret (app role) that excalidash.yaml's
+# EXCALIDASH_DBUSER/EXCALIDASH_DBPASS reference.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: excalidash-postgres
+  namespace: excalidash
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17-bookworm
+  storage:
+    size: 5Gi
+    storageClass: longhorn
+  bootstrap:
+    initdb:
+      database: excalidash
+      owner: excalidash
+  enablePDB: false

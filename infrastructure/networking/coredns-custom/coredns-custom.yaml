@@ -61,6 +61,7 @@ data:
             192.168.1.240 chat.jvos.dev
             192.168.1.240 status.jvos.dev
             192.168.1.240 paste.jvos.dev
+            192.168.1.240 draw.jvos.dev
             fallthrough
         }
         forward . /etc/resolv.conf
