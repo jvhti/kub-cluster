@@ -40,8 +40,17 @@ debug:
 k8sClientRateLimit:
   qps: 100
   burst: 200
+# L2 neighbor announcements (ARP/ND) are DISABLED. The gateway VIPs
+# (192.168.1.240 gateway-internal / 192.168.1.241 gateway-headscale) are
+# static secondary IPs on kub-ctrl-1's ens18 instead (see CLAUDE.md
+# "Node-local state"), so the kernel answers ARP for them directly. This
+# removes the whole L2-announce failure class: no lease re-election picking
+# a node with no LAN iface (kub-node-1) or announcing on the wrong segment
+# (pi1's eth0 10.1.0.0/8 instead of wlan0 192.168.1.0/24), no BPF-vs-kernel
+# ARP races. The LoadBalancer Service + Maglev VIP->backend datapath are
+# unchanged — only the neighbor-resolution mechanism swapped.
 l2announcements:
-  enabled: true
+  enabled: false
 # By default, NetworkPolicy ipBlock rules do NOT match intra-cluster IPs
 # (pod/node IPs, including Service ClusterIPs like the kube-apiserver's) under
 # Cilium - confirmed live: Pangolin's controller egress rule
