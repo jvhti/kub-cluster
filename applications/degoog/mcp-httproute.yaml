@@ -6,12 +6,18 @@ metadata:
   annotations:
     # LAN-only hostname: external-dns (Cloudflare, policy: sync) watches
     # every HTTPRoute on gateway-internal and would publish a public A record
-    # without this - and the MCP endpoint has no auth of its own, so going
-    # public would expose the search aggregator to the internet. Skip public
-    # DNS; LAN clients resolve this via the Technitium split-horizon zone
-    # (infrastructure/dns-technitium/README.md) and pods via coredns-custom,
-    # both pointing at gateway-internal's VIP like every other entry.
-    external-dns.k8s.io/ignore: "true"
+    # otherwise - and the MCP endpoint has no auth of its own, so going
+    # public would expose the search aggregator to the internet. v0.21.0 has
+    # no per-route "ignore" annotation for Gateway sources (the old
+    # external-dns.k8s.io/ignore doesn't exist at all in that version -
+    # tried it live, the record got created anyway), so instead tell it to
+    # derive hostnames ONLY from the external-dns.alpha.kubernetes.io/hostname
+    # annotation, which is deliberately absent here -> zero endpoints -> no
+    # public record. LAN clients resolve this via the Technitium
+    # split-horizon zone (infrastructure/dns-technitium/README.md) and pods
+    # via coredns-custom, both pointing at gateway-internal's VIP like every
+    # other entry.
+    external-dns.alpha.kubernetes.io/gateway-hostname-source: "annotation-only"
 spec:
   parentRefs:
     - name: gateway-internal
