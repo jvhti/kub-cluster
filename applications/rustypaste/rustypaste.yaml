@@ -29,6 +29,21 @@ spec:
       labels:
         app: rustypaste
     spec:
+      # Keep off overkill until its pod-networking bug is root-caused (same
+      # workaround as gatus): a pod scheduled there is unreachable cross-node —
+      # a direct curl to its pod IP from another node gets "No route to host"
+      # (confirmed live), which breaks the gateway→Service→pod client path even
+      # though the node-local kube-probe still reads healthy. See the matching
+      # block in applications/gatus/gatus.yaml for the full investigation.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - overkill
       # The official image is FROM scratch and ships as USER 1000:1000, but it
       # writes every uploaded file into the Longhorn RWO volume below, which
       # kubelet mounts root-owned (Longhorn's CSI driver does not apply
