@@ -23,5 +23,6 @@ extraArgs:
   cookie-domain: .jvos.dev
   whitelist-domain: .jvos.dev
   reverse-proxy: "true"
-  set-xauthrequest: "true"
-  upstream: http://prometheus-kube-prometheus-stack-alertmanager.kube-prometheus-stack.svc.cluster.local:9093
+   set-xauthrequest: "true"
+   cookie-max-age: "604800"
+   upstream: http://prometheus-kube-prometheus-stack-alertmanager.kube-prometheus-stack.svc.cluster.local:9093

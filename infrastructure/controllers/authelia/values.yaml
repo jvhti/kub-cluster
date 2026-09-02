@@ -151,8 +151,8 @@ configMap:
   session:
     name: 'authelia_session'
     same_site: 'lax'
-    expiration: '1 hour'
-    inactivity: '5 minutes'
+    expiration: '1 year'
+    inactivity: '1 month'
     remember_me: '1 month'
     encryption_key:
       secret_name: authelia-crypto
