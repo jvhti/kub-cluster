@@ -24,12 +24,22 @@ spec:
       labels:
         app: degoog-mcp
     spec:
+      # Same collision class as degoog.yaml: the Service below is named
+      # "degoog-mcp", so Kubernetes auto-injects DEGOOG_MCP_PORT=tcp://
+      # <clusterIP>:4443 (legacy service-links), which degoog-mcp reads as
+      # its listen address - "listen tcp: address :tcp://...: too many
+      # colons in address" crash loop. Disable service-links and set the
+      # port explicitly, exactly like the main deployment does for
+      # DEGOOG_PORT.
+      enableServiceLinks: false
       containers:
         - name: degoog-mcp
           image: ghcr.io/degoog-org/mcp:latest
           env:
             - name: TZ
               value: America/Sao_Paulo
+            - name: DEGOOG_MCP_PORT
+              value: "4443"
             - name: DEGOOG_MCP_DEGOOG_URL
               value: http://degoog:4444
             # Optional tuning (see upstream mcp.yml for what each does):
