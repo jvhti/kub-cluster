@@ -561,3 +561,101 @@ WebUI default referenced in `openwebui.yaml`. Voices can also be blended
 `http://192.168.1.18:8880/v1`, API Key `not-needed`, Model `kokoro`, Voice
 `pf_dora`. These are overridable in the UI at runtime; the env vars just
 seed the defaults on first boot.
+
+## STT: faster-whisper on the Proxmox LXC (`192.168.1.18:8890`)
+
+The same Proxmox LXC (`192.168.1.18`) serves Speech-to-Text on port `8890`,
+consumed by Open WebUI's "openai" STT engine (see `openwebui.yaml`'s
+`STT_*` envs). Like the LLM and Kokoro TTS, it's **not** part of the k3s
+cluster / ArgoCD-managed.
+
+### Why English-only and which model
+
+Open WebUI's STT is wired as an **external OpenAI-compatible
+`/v1/audio/transcriptions`** endpoint (not the in-process `faster-whisper`
+engine), mirroring the TTS architecture — the model stays off the Open
+WebUI pod. English-only was the requirement, so we use the `.en`-optimized
+CTranslate2 conversions (`Systran/...`), which are more accurate and faster
+than general models for English:
+
+- `Systran/faster-whisper-tiny.en` — fastest / lowest RAM (~75MB)
+- `Systran/faster-whisper-base.en` (~140MB)
+- `Systran/faster-whisper-small.en` (~460MB) — **current**, best
+  latency/accuracy balance on the already-loaded 8-core box
+
+The `00-first.lc` / `-T` Pyserini built-in options aren't used; `vad_filter`
+plus the `.en` model cover the speech-detection need.
+
+### Note: `faster-whisper-server` PyPI package is broken
+
+The third-party `faster-whisper-server` PyPI package (v0.0.2, the only
+release) ships with a bug — `_get_version()` tries to `open()` a
+`pyproject.toml` from inside site-packages that doesn't exist in the wheel,
+so the CLI crashes on import. Rather than patch a broken-on-arrival package,
+we run a ~45-line FastAPI wrapper directly around the well-maintained
+`faster-whisper` library. OpenAI-compatible shape: `POST /v1/audio/
+transcriptions` (multipart `file`), plus `/health`.
+
+### Install + systemd on the LXC
+
+```bash
+pct exec 139 -- sh -c '
+  apt-get update && apt-get install -y python3.13-venv ffmpeg
+  python3 -m venv /opt/faster-whisper-server/.venv
+  /opt/faster-whisper-server/.venv/bin/pip install --upgrade pip
+  /opt/faster-whisper-server/.venv/bin/pip install faster-whisper fastapi uvicorn python-multipart
+'
+```
+
+Then write `/opt/faster-whisper-server/app.py` (the FastAPI wrapper — source
+in this repo is reference only; the live copy on the LXC is the truth). Key
+bit: keep the incoming form field for `model` named `model_name`, because a
+form param literally called `model` shadows the module-level
+`WhisperModel` and produces `'str' object has no attribute 'transcribe'`.
+
+```ini
+# /etc/systemd/system/faster-whisper-stt.service
+[Unit]
+Description=faster-whisper STT server (OpenAI-compatible /v1/audio/transcriptions)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=root
+WorkingDirectory=/opt/faster-whisper-server
+Environment=WHISPER_MODEL=Systran/faster-whisper-small.en
+Environment=WHISPER_DEVICE=cpu
+Environment=WHISPER_COMPUTE_TYPE=int8
+Environment=OMP_NUM_THREADS=4
+ExecStart=/opt/faster-whisper-server/.venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port 8890
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+pct exec 139 -- systemctl daemon-reload
+pct exec 139 -- systemctl enable --now faster-whisper-stt
+```
+
+The model downloads to `~/.cache/huggingface` on first start.
+
+### Verify
+
+```bash
+curl http://192.168.1.18:8890/health              # {"status":"healthy",...}
+curl -X POST http://192.168.1.18:8890/v1/audio/transcriptions \
+  -F "file=@/tmp/test.wav" -F "model=whisper-1"     # {"text":"..."}
+curl -X POST http://192.168.1.18:8890/v1/audio/transcriptions \
+  -F "file=@/tmp/test.wav" -F "model=whisper-1" -F "response_format=verbose_json"
+```
+
+### Open WebUI side
+
+`openwebui.yaml` sets the matching envs: `STT_ENGINE=openai`,
+`STT_OPENAI_API_BASE_URL=http://192.168.1.18:8890/v1`,
+`STT_OPENAI_API_KEY=not-needed`, `STT_MODEL=whisper-1`. In the UI (Admin →
+Settings → Speech-to-Text) these should read Engine `OpenAI`, API Base URL
+`http://192.168.1.18:8890/v1`, API Key `not-needed`, Model `whisper-1`.

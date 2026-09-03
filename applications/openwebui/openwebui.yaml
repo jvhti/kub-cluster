@@ -131,6 +131,19 @@ spec:
             # has; switch to an af_* (e.g. af_heart) for en-US female.
             - name: AUDIO_TTS_VOICE
               value: "pf_dora"
+            # Speech-to-text: local faster-whisper server on the same
+            # llama-cpp LXC (tiny OpenAI-compatible FastAPI wrapper). English
+            # only (Systran/faster-whisper-small.en, tiny.en/base.en/small.en
+            # are the English-optimized options). Runs on CPU there. See
+            # docs/local-llm-setups.md "STT".
+            - name: STT_ENGINE
+              value: "openai"
+            - name: STT_OPENAI_API_BASE_URL
+              value: http://192.168.1.18:8890/v1
+            - name: STT_OPENAI_API_KEY
+              value: "not-needed"
+            - name: STT_MODEL
+              value: "whisper-1"
           ports:
             - containerPort: 8080
           volumeMounts:
