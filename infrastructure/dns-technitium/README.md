@@ -76,6 +76,7 @@ block — same set of hostnames, same targets.
 | `search.jvos.dev` | `192.168.1.240` |
 | `search-mcp.jvos.dev` | `192.168.1.240` |
 | `memos.jvos.dev` | `192.168.1.240` |
+| `picoclaw.jvos.dev` | `192.168.1.240` |
 | `start.jvos.dev` | `192.168.1.240` |
 | `chat.jvos.dev` | `192.168.1.240` |
 | `status.jvos.dev` | `192.168.1.240` |
