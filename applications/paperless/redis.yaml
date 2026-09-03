@@ -18,6 +18,22 @@ spec:
       labels:
         app: paperless-redis
     spec:
+      # Soft-preferred onto pi1: a tiny task-queue broker, no real CPU need,
+      # and pi1 (arm64, 4 vCPU/8GB) has more spare headroom than the two k8s
+      # VMs, which were found oversubscribed on host RAM (2026-09-03).
+      # "preferred" not "required" so it still schedules fine if pi1 is ever
+      # down. (The main paperless app itself stays unpinned — it does real
+      # OCR/PDF CPU work, a poor fit for pi1's smaller cores.)
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - pi1
       containers:
         - name: redis
           image: valkey/valkey:8.1.4

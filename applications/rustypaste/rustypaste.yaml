@@ -35,6 +35,12 @@ spec:
       # (confirmed live), which breaks the gateway→Service→pod client path even
       # though the node-local kube-probe still reads healthy. See the matching
       # block in applications/gatus/gatus.yaml for the full investigation.
+      #
+      # Soft-preferred onto pi1: a tiny single-binary pastebin with no real
+      # CPU need, and pi1 (arm64, 4 vCPU/8GB) has more spare headroom than
+      # the two k8s VMs, which were found oversubscribed on host RAM
+      # (2026-09-03). "preferred" not "required" so it still schedules fine
+      # if pi1 is ever down.
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -44,6 +50,14 @@ spec:
                     operator: NotIn
                     values:
                       - overkill
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - pi1
       # The official image is FROM scratch and ships as USER 1000:1000, but it
       # writes every uploaded file into the Longhorn RWO volume below, which
       # kubelet mounts root-owned (Longhorn's CSI driver does not apply
