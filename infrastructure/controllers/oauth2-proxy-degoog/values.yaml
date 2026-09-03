@@ -22,7 +22,7 @@ extraArgs:
   oidc-issuer-url: https://auth.jvos.dev
   redirect-url: https://search.jvos.dev/oauth2/callback
   email-domain: "*"
-  cookie-domain: .jvos.dev
+  cookie-domain: search.jvos.dev
   whitelist-domain: .jvos.dev
   reverse-proxy: "true"
   set-xauthrequest: "true"

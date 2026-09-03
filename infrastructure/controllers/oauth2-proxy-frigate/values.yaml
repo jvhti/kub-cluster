@@ -58,7 +58,7 @@ extraArgs:
   oidc-issuer-url: https://auth.jvos.dev
   redirect-url: https://frigate.jvos.dev/oauth2/callback
   email-domain: "*" # No group/domain restriction beyond Authelia's own single-user login gating who can authenticate at all.
-  cookie-domain: .jvos.dev # Matches Authelia's session cookie domain (infrastructure/controllers/authelia/values.yaml's configMap.session.cookies) so the two share scope correctly.
+  cookie-domain: frigate.jvos.dev # Scoped to this host only. All 7 proxies previously shared .jvos.dev + the default _oauth2_proxy cookie name, so logging into any other .jvos.dev app overwrote this session cookie (oauth2-proxy#2177) — the "keeps asking me to sign in" bug. SSO still works via Authelia's own cookie on auth.jvos.dev.
   whitelist-domain: .jvos.dev
   reverse-proxy: "true" # Sits behind Cilium's Envoy Gateway — needed so X-Forwarded-* headers are honored correctly.
   set-xauthrequest: "true" # See the security-model comment above — frigate's /auth subrequest only sees headers it's explicitly told to trust; this is how the authenticated user reaches it.

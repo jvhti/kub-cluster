@@ -21,7 +21,7 @@ extraArgs:
   oidc-issuer-url: https://auth.jvos.dev
   redirect-url: https://prometheus.jvos.dev/oauth2/callback
   email-domain: "*"
-  cookie-domain: .jvos.dev
+  cookie-domain: prometheus.jvos.dev
   whitelist-domain: .jvos.dev
   reverse-proxy: "true"
   set-xauthrequest: "true"
