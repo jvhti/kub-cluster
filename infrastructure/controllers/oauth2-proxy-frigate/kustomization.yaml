@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - reference-grant.yaml
+  - injector-nginx-configmap.yaml
+  # - secrets.yaml  # Real values created imperatively — see that file's comments.
+
+helmCharts:
+  - name: oauth2-proxy
+    repo: https://oauth2-proxy.github.io/manifests
+    version: 10.7.0 # renovate: github-releases=oauth2-proxy/manifests
+    releaseName: oauth2-proxy-frigate
+    namespace: oauth2-proxy-frigate
+    valuesFile: values.yaml
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "-2" # After authelia (-3), same wave as the Longhorn/degoog instances' HTTPRoute backendRef change.

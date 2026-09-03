@@ -110,6 +110,12 @@ pod:
         items:
           - key: client-secret-hash
             path: client-secret-hash.txt
+    - name: oidc-client-secret-frigate
+      secret:
+        secretName: authelia-oidc-client-frigate
+        items:
+          - key: client-secret-hash
+            path: client-secret-hash.txt
   extraVolumeMounts:
     - name: users-database
       mountPath: /config/users_database.yml
@@ -157,6 +163,10 @@ pod:
       readOnly: true
     - name: oidc-client-secret-picoclaw
       mountPath: /secrets/client-secret-hash-picoclaw.txt
+      subPath: client-secret-hash.txt
+      readOnly: true
+    - name: oidc-client-secret-frigate
+      mountPath: /secrets/client-secret-hash-frigate.txt
       subPath: client-secret-hash.txt
       readOnly: true
 
@@ -447,6 +457,29 @@ configMap:
           authorization_policy: 'one_factor'
           redirect_uris:
             - 'https://picoclaw.jvos.dev/oauth2/callback'
+          scopes:
+            - 'openid'
+            - 'profile'
+            - 'email'
+            - 'groups'
+          grant_types:
+            - 'authorization_code'
+          response_types:
+            - 'code'
+          # NOT setting token_endpoint_auth_method — see Learning #1 in
+          # docs/oauth2-proxy-authelia.md.
+        - client_id: 'oauth2-proxy-frigate'
+          client_name: 'oauth2-proxy (frigate)'
+          client_secret:
+            path: '/secrets/client-secret-hash-frigate.txt'
+          public: false
+          authorization_policy: 'one_factor'
+          redirect_uris:
+            # Frigate runs outside the cluster (TrueNAS app on 10.0.0.5) —
+            # this client fronts it the same way the other oauth2-proxy
+            # clients do, via the dedicated instance in
+            # infrastructure/controllers/oauth2-proxy-frigate/.
+            - 'https://frigate.jvos.dev/oauth2/callback'
           scopes:
             - 'openid'
             - 'profile'

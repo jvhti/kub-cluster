@@ -1,0 +1,31 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: frigate
+  namespace: frigate
+spec:
+  parentRefs:
+    - name: gateway-internal
+      namespace: gateway
+      sectionName: https
+  hostnames:
+    - "frigate.jvos.dev"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        # Routes through the frigate-dedicated oauth2-proxy instance instead
+        # of straight at the TrueNAS box — frigate runs OUTSIDE the cluster
+        # (TrueNAS app on 10.0.0.5, host port 30193) and has its own auth
+        # disabled (it trusts proxy headers), so the public path needs the
+        # same Authelia-backed login gate as every other public app here.
+        # A SEPARATE oauth2-proxy instance from Longhorn's/degoog's — see
+        # infrastructure/controllers/oauth2-proxy-frigate/values.yaml for
+        # why one shared instance can't front multiple hostnames. Needs the
+        # ReferenceGrant in that same directory (cross-namespace backendRef).
+        - name: oauth2-proxy-frigate
+          namespace: oauth2-proxy-frigate
+          port: 80
+          weight: 1

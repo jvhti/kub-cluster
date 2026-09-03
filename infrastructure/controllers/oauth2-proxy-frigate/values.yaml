@@ -1,0 +1,112 @@
+# Third oauth2-proxy instance, dedicated to Frigate — same "one instance per
+# app" pattern as the Longhorn (../oauth2-proxy) and degoog
+# (../oauth2-proxy-degoog) siblings. See
+# infrastructure/controllers/oauth2-proxy-degoog/values.yaml's header for
+# why a shared multi-host instance is not an option, and
+# ../oauth2-proxy/values.yaml's header for why alpha-config was rejected in
+# favor of the legacy CLI-flag path this file uses.
+#
+# Frigate runs OUTSIDE the cluster, as a TrueNAS app on the TrueNAS box
+# (10.0.0.5) — see docs/truenas-app-migrations.md for the general
+# TrueNAS-via-REST-API pattern used to (re)configure it, and
+# docs/frigate-true-nas.md for the full why/how of this specific setup,
+# including the port-binding trap that shaped the design below.
+#
+# SECURITY MODEL (read before changing anything in this file):
+# Frigate 0.17.2's own auth is DISABLED (auth.enabled: false in its
+# config.yaml, set via the TrueNAS filesystem API) — it trusts proxy
+# headers. That gate can only be safe if nothing outside the cluster can
+# reach 10.0.0.5:30193 directly, so:
+#   1. This pod runs an nginx "injector" sidecar (extraContainers below)
+#      bound to 127.0.0.1:30194 ONLY — the upstream is that sidecar, not
+#      10.0.0.5 directly.
+#   2. The sidecar is the only component that knows the proxy secret
+#      (frigate-proxy-secret Secret, created imperatively — see
+#      secrets.yaml): it adds the X-Proxy-Secret header on every hop to
+#      10.0.0.5:30193, and frigate's config.yaml sets
+#      proxy.auth_secret to the same value, so frigate 401s ANY request
+#      that didn't come through the sidecar — including direct LAN
+#      access, because TrueNAS's 10.0.0.5/8 management network and the
+#      192.168.1.0/24 LAN are ONE flat L2 (both are aliases on the same
+#      TrueNAS NIC, enp6s0), so a LAN client CAN reach 10.0.0.5:30193
+#      — it just gets a 401 on every request without the secret.
+#   3. (A TrueNAS published-port host_ips binding was considered as the
+#      boundary instead and is IMPOSSIBLE here: host_ips must be an IP on
+#      a TrueNAS interface — the only candidates are 10.0.0.5 and
+#      192.168.1.12, both on that same flat L2, so binding either one
+#      blocks nothing; the k3s node IPs it would actually need to be
+#      bound to (10.1.0.x) don't exist on TrueNAS at all, and docker
+#      refuses to bind a published port to a non-local address.)
+#
+# The user identity frigate acts as comes from the X-Auth-Request-User
+# header set-xauthrequest adds below (after this instance's Authelia
+# login gate has validated it) — frigate's own nginx copies that header
+# into its internal /auth subrequest (its
+# docker/main/rootfs/usr/local/nginx/conf/proxy_trusted_headers.conf
+# trusts X-Auth-Request-User/X-Auth-Request-Groups/...), and its
+# config.yaml maps proxy.header_map.user: X-Auth-Request-User to
+# remote-user.
+#
+# See secrets.yaml for how config.existingSecret's keys (and the
+# frigate-proxy-secret sidecar key) get their real values.
+
+config:
+  existingSecret: oauth2-proxy-frigate-credentials
+
+extraArgs:
+  provider: oidc
+  oidc-issuer-url: https://auth.jvos.dev
+  redirect-url: https://frigate.jvos.dev/oauth2/callback
+  email-domain: "*" # No group/domain restriction beyond Authelia's own single-user login gating who can authenticate at all.
+  cookie-domain: .jvos.dev # Matches Authelia's session cookie domain (infrastructure/controllers/authelia/values.yaml's configMap.session.cookies) so the two share scope correctly.
+  whitelist-domain: .jvos.dev
+  reverse-proxy: "true" # Sits behind Cilium's Envoy Gateway — needed so X-Forwarded-* headers are honored correctly.
+  set-xauthrequest: "true" # See the security-model comment above — frigate's /auth subrequest only sees headers it's explicitly told to trust; this is how the authenticated user reaches it.
+  # --cookie-expire (default is already 168h) — set explicitly so the proxy's
+  # session lifetime stays a full week even if the upstream default changes;
+  # the Authelia session (1 year) is the real ceiling.
+  cookie-expire: 168h
+  # NOT https://10.0.0.5:30193 directly — the 127.0.0.1-bound injector
+  # sidecar (extraContainers below) is the hop that adds X-Proxy-Secret;
+  # the sidecar in turn proxies to frigate with TLS verification disabled
+  # (frigate's self-signed "FRIGATE DEFAULT CERT", CN=*).
+  upstream: http://127.0.0.1:30194
+
+extraVolumes:
+  # The injector's nginx config. It's a *.template file so the official
+  # nginx image's entrypoint envsubs it (FRIGATE_PROXY_SECRET from the
+  # frigate-proxy-secret Secret, see the extraContainers env below) into
+  # /etc/nginx/conf.d/ at container start.
+  - name: injector-nginx-conf
+    configMap:
+      name: frigate-injector-nginx
+
+extraContainers:
+  # The injector: the ONLY path from this pod to 10.0.0.5:30193, and the
+  # only place the proxy secret exists (besides frigate's own
+  # config.yaml on the TrueNAS box — the two must stay in sync; see
+  # docs/frigate-true-nas.md for the rotation procedure). Listens on
+  # 127.0.0.1 ONLY — nothing else in the cluster can reach it directly.
+  # Handles websockets (frigate's UI) and long-lived MJPEG streams
+  # (proxy_buffering off, generous timeouts), same requirements as
+  # frigate's own nginx hop in front of its backend.
+  - name: frigate-injector
+    image: docker.io/library/nginx:1.27-alpine # Matches frigate 0.17.2's own nginx major version (1.27), so its streaming/websocket behavior is as close to identical as possible.
+    # No hostPort — the "listen 127.0.0.1:30194" in the nginx config below
+    # is what keeps this off the pod IP entirely.
+    env:
+      - name: FRIGATE_PROXY_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: frigate-proxy-secret
+            key: proxy-secret
+    volumeMounts:
+      - name: injector-nginx-conf
+        mountPath: /etc/nginx/templates
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi

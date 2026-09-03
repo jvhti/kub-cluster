@@ -46,7 +46,7 @@ complexity for the same end result a hand-maintained zone gets more simply
 discipline, so this isn't a new maintenance burden, just the same one
 applied to a second DNS server.
 
-## Records (as of 2026-08-21, memos deployment)
+## Records (as of 2026-09-03, frigate deployment)
 
 All TTL 300s. Keep this list in sync with `coredns-custom.yaml`'s `hosts`
 block — same set of hostnames, same targets.
@@ -76,11 +76,13 @@ block — same set of hostnames, same targets.
 | `search.jvos.dev` | `192.168.1.240` |
 | `search-mcp.jvos.dev` | `192.168.1.240` |
 | `memos.jvos.dev` | `192.168.1.240` |
+| `memos-mcp.jvos.dev` | `192.168.1.240` |
 | `picoclaw.jvos.dev` | `192.168.1.240` |
 | `start.jvos.dev` | `192.168.1.240` |
 | `chat.jvos.dev` | `192.168.1.240` |
 | `status.jvos.dev` | `192.168.1.240` |
 | `draw.jvos.dev` | `192.168.1.240` |
+| `frigate.jvos.dev` | `192.168.1.240` |
 | `headscale.jvos.dev` | `192.168.1.241` |
 
 ## Adding a new hostname later

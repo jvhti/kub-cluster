@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frigate-injector-nginx
+  namespace: oauth2-proxy-frigate
+data:
+  # Mounted at /etc/nginx/templates/default.conf.template — the official
+  # nginx image's entrypoint envsubs it (substituting ONLY variables
+  # present in the container's environment, i.e. FRIGATE_PROXY_SECRET —
+  # nginx's own $http_*/$proxy_* variables pass through untouched) into
+  # /etc/nginx/conf.d/default.conf at container start.
+  default.conf.template: |
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        ''      close;
+    }
+
+    server {
+        # 127.0.0.1 ONLY — this injector is reachable from nowhere except
+        # the oauth2-proxy container in the same pod (values.yaml's
+        # extraArgs.upstream: http://127.0.0.1:30194).
+        listen 127.0.0.1:30194;
+
+        # Frigate serves a self-signed wildcard cert ("FRIGATE DEFAULT
+        # CERT", CN=*) on 10.0.0.5:30193 — there is no CA to trust here,
+        # and the hop stays on the private 10.0.0.0/8 management network.
+        proxy_ssl_verify off;
+
+        location / {
+            proxy_pass https://10.0.0.5:30193;
+            proxy_http_version 1.1;
+
+            # THE gate: frigate's config.yaml sets proxy.auth_secret to
+            # the same value; its /auth endpoint 401s any request without
+            # a matching X-Proxy-Secret (frigate's own nginx copies it
+            # into the /auth subrequest — its
+            # proxy_trusted_headers.conf includes X-Proxy-Secret). This
+            # is what makes direct LAN access to 10.0.0.5:30193 useless
+            # — see values.yaml's security-model comment for why a
+            # TrueNAS host-port binding can't do this job instead.
+            proxy_set_header X-Proxy-Secret "${FRIGATE_PROXY_SECRET}";
+
+            # Identity set by the oauth2-proxy container after its
+            # Authelia login gate (set-xauthrequest) — frigate's
+            # config.yaml maps proxy.header_map.user: X-Auth-Request-User
+            # to remote-user.
+            proxy_set_header X-Auth-Request-User $http_x_auth_request_user;
+            proxy_set_header X-Auth-Request-Groups $http_x_auth_request_groups;
+            proxy_set_header X-Auth-Request-Email $http_x_auth_request_email;
+
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-Host $host;
+
+            # Frigate's UI uses websockets (live views) and long-lived
+            # MJPEG streams — same requirements as frigate's own nginx
+            # hop in front of its backend.
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_read_timeout 3600s;
+            proxy_send_timeout 3600s;
+            proxy_connect_timeout 30s;
+            client_max_body_size 0;
+        }
+    }
