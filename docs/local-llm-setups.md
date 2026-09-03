@@ -422,3 +422,142 @@ PATH=/opt/cuda/bin:$PATH cmake --build build --config Release -j16
   the server**, not relied upon from the client, if a Qwen3-family model
   is involved and thinking mode isn't wanted — client toggles (at least
   Open WebUI's) aren't guaranteed to actually reach the backend request.
+
+---
+
+## TTS: Kokoro-82M on the Proxmox LXC (`192.168.1.18:8880`)
+
+Separate from the LLM inference above, the same Proxmox LXC (`192.168.1.18`)
+also serves Text-to-Speech on port `8880`, consumed by Open WebUI's "openai"
+TTS engine (see `applications/openwebui/openwebui.yaml`'s `AUDIO_TTS_*` envs).
+Like the LLM, it is **not** part of the k3s cluster / ArgoCD-managed.
+
+### Why Kokoro (not Piper)
+
+- Piper has **no female pt-BR voice at any quality tier** (only male:
+  `edresson`, `cadu`, `faber`, `jeff`) — see
+  [rhasspy/piper#766](https://github.com/rhasspy/piper/issues/766), an open
+  request for exactly this.
+- **Kokoro-82M** provides `pf_dora` (pt-BR female) plus a raft of `af_*`
+  English female voices, is Apache-2.0, ~82M params (~350MB fp32), and runs
+  fast enough on CPU for chat TTS (see "Runs on CPU" below).
+
+### Runs on CPU (not GPU) — why
+
+Tried GPU first (Kokoro's 800MiB resident footprint seemed to coexist with
+the LLM), but it **conflicts on the 6GB card**: llama-server needs contiguous
+free VRAM to load a model, and with Kokoro resident the router aborted with
+`W common_fit_params: failed to fit params to free device memory:
+n_gpu_layers already set by user to 99, abort`. Observed split was
+llama-server 4932MiB + Kokoro 800MiB = 5732MiB/6144MiB, leaving only
+~400MiB — not enough for an LLM load.
+
+Resolution: **run Kokoro on CPU** (`USE_GPU=false`). It uses 0 GPU VRAM, so
+llama-server gets the full 6GB back. Kokoro-82M is fast enough on CPU for
+short-sentence synthesis (a ~50-char sentence synthesizes in about a second,
+well within real-time for chat TTS). This is the documented configuration;
+nothing is lost by not using the GPU.
+
+### Server: `remsky/Kokoro-FastAPI`
+
+The GitHub repo (already has all the `.pt` voice packs committed, including
+`pf_dora`, `af_heart`, etc. in `api/src/voices/v1_0/`). Exposes
+`POST /v1/audio/speech` (OpenAI-compatible) plus `/v1/models`, `/health`,
+and a web UI at `/web`. Native install matched to llama.cpp (no Docker).
+
+#### Install (uv, systemd) on the LXC
+
+```bash
+pct exec 139 -- bash - <<'EOF'
+set -eux
+# Prereqs (uv runtime + espeak-ng phonemizer fallback)
+apt-get update && apt-get install -y espeak-ng ffmpeg
+curl -LsSf https://astral.sh/uv/install.sh | sh   # -> /root/.local/bin/uv
+
+# Clone the repo (Python 3.12 venv managed by uv)
+git clone https://github.com/remsky/Kokoro-FastAPI.git /opt/Kokoro-FastAPI
+cd /opt/Kokoro-FastAPI
+export PATH=/root/.local/bin:$PATH
+uv venv .venv                                       # creates CPython 3.12 env
+# Installs deps + torch: use the cpu extra here (GPU conflicts, see above).
+# Were GPU ever wanted: `uv pip install -e ".[gpu]"` (torch 2.8.0+cu126).
+uv pip install -e ".[cpu]"
+
+# Download the model into the tree (checksum-verified)
+. .venv/bin/activate
+export PYTHONPATH=$PWD:$PWD/api
+uv run --no-sync python docker/scripts/download_model.py --output api/src/models/v1_0
+EOF
+```
+
+Then the systemd unit. The `MODEL_DIR`/`VOICES_DIR` envs are **required**:
+the repo's config defaults to container-absolute `/app/...` paths that don't
+exist on this host; setting them relative (`src/models`, `src/voices/v1_0`)
+makes `api/src/core/paths.py` resolve them against `$PWD/api` correctly.
+`USE_GPU=false` is what keeps it off the card.
+
+```ini
+# /etc/systemd/system/kokoro-tts.service
+[Unit]
+Description=Kokoro TTS server (OpenAI-compatible /v1/audio/speech)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=root
+WorkingDirectory=/opt/Kokoro-FastAPI
+Environment=USE_GPU=false
+Environment=PYTHONPATH=/opt/Kokoro-FastAPI:/opt/Kokoro-FastAPI/api
+Environment=MODEL_DIR=src/models
+Environment=VOICES_DIR=src/voices/v1_0
+Environment=WEB_PLAYER_PATH=/opt/Kokoro-FastAPI/web
+Environment=API_LOG_LEVEL=INFO
+Environment=HOME=/root
+ExecStart=/opt/Kokoro-FastAPI/.venv/bin/uvicorn api.src.main:app --host 0.0.0.0 --port 8880
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+pct exec 139 -- systemctl daemon-reload
+pct exec 139 -- systemctl enable --now kokoro-tts
+```
+
+Startup log should show `Initializing Kokoro V1 on cpu` and `Running on CPU`
+plus `68 voice packs loaded`. If it ever says `on cuda`, `USE_GPU` wasn't
+picked up — the LLM will then fail to load (see "Runs on CPU" above).
+
+#### Verify
+
+```bash
+# liveness + voice count
+curl http://192.168.1.18:8880/health
+
+# a real synthesis (pt-BR female)
+curl -X POST http://192.168.1.18:8880/v1/audio/speech \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"kokoro","input":"Olá mundo!","voice":"pf_dora","response_format":"mp3"}' \
+  --output /tmp/ola.mp3
+
+# and en-US female
+curl -X POST http://192.168.1.18:8880/v1/audio/speech \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"kokoro","input":"Hello world!","voice":"af_heart","response_format":"mp3"}' \
+  --output /tmp/hello.mp3
+```
+
+`pf_dora` (pt-BR female) and `af_heart` / `af_bella` / `af_jessica` /
+`af_sky` (en-US females) are the relevant voices; `pf_dora` is the Open
+WebUI default referenced in `openwebui.yaml`. Voices can also be blended
+(`voice: "af_sky+af_bella"`).
+
+#### Open WebUI side
+
+`openwebui.yaml` already sets the matching envs; in the UI (Admin → Settings
+→ Audio → TTS) the values should read: Engine `OpenAI`, API Base URL
+`http://192.168.1.18:8880/v1`, API Key `not-needed`, Model `kokoro`, Voice
+`pf_dora`. These are overridable in the UI at runtime; the env vars just
+seed the defaults on first boot.

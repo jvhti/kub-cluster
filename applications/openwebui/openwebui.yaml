@@ -1,6 +1,8 @@
 # Open WebUI (https://docs.openwebui.com) — chat frontend against a local
 # llama.cpp/Qwen server running on a separate LAN host (192.168.1.210:8090,
 # outside the cluster — no in-cluster networking needed, just outbound HTTP).
+# TTS is served by a Kokoro FastAPI server running on the same LXC
+# (192.168.1.18:8880) — see docs/local-llm-setups.md "TTS".
 # Single standalone Deployment, no gluetun netns needed — same shape as
 # kavita/memos/homarr.
 #
@@ -111,6 +113,24 @@ spec:
                 secretKeyRef:
                   name: openwebui-secrets
                   key: webui-secret-key
+            # TTS: point the "openai" engine at the Kokoro FastAPI server
+            # running on the llama.cpp LXC (192.168.1.18, same host that
+            # serves OPENAI_API_BASE_URL above). Kokoro-82M gives local
+            # pt-BR + en-US female voices; it runs on CPU there (GPU VRAM
+            # is fully reserved for the llama.cpp LLM — see
+            # docs/local-llm-setups.md "TTS").
+            - name: AUDIO_TTS_ENGINE
+              value: "openai"
+            - name: AUDIO_TTS_OPENAI_API_BASE_URL
+              value: http://192.168.1.18:8880/v1
+            - name: AUDIO_TTS_OPENAI_API_KEY
+              value: "not-needed"
+            - name: AUDIO_TTS_MODEL
+              value: "kokoro"
+            # Default voice: pf_dora is the only pt-BR female voice Kokoro
+            # has; switch to an af_* (e.g. af_heart) for en-US female.
+            - name: AUDIO_TTS_VOICE
+              value: "pf_dora"
           ports:
             - containerPort: 8080
           volumeMounts:
