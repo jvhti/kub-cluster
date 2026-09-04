@@ -1,6 +1,44 @@
 # Langfuse Helm chart values — all external deps pointed at shared
 # infrastructure (CNPG Postgres, shared ClickHouse, Valkey, Garage S3).
 # Chart: langfuse/langfuse v2.0.0 (v4 baseline).
+#
+# NOTE on structure: v2.0.0 reads the auth / nextauth / feature flags from the
+# top-level `langfuse:` block (NOT from flat top-level keys). The flat
+# `web` / `worker` / `postgres` / `auth` keys below are a leftover from the
+# older community-chart shape and are IGNORED by v2.0.0 — only `redis` /
+# `clickhouse` / `s3` (which ARE top-level in v2.0.0) actually take effect,
+# plus the `langfuse:` block added here for SSO. They're left as-is on purpose
+# to avoid touching the running bundled Postgres (langfuse-web's live
+# DATABASE_HOST is the chart's bundled `langfuse-postgresql`, not the separate
+# CNPG `langfuse-postgres-rw`).
+langfuse:
+  # Canonical public URL — required for SSO/OIDC. NextAuth builds the callback
+  # URL ({NEXTAUTH_URL}/api/auth/callback/custom) and validates redirects from
+  # it. Previously unset -> the chart defaulted to http://localhost:3000 and
+  # SSO could not work.
+  nextauth:
+    url: https://langfuse.jvos.dev
+  features:
+    # Disable public sign-up / account creation. Users authenticate via the
+    # Authelia OIDC provider below; existing email/password accounts still work.
+    signUpDisabled: true
+  auth:
+    # Langfuse is its own OIDC client (Auth.js "custom" provider) authenticating
+    # straight against Authelia — same pattern as Homarr / Open WebUI / Gatus /
+    # ExcaliDash (see docs/oauth2-proxy-authelia.md for the client-secret pair
+    # procedure). Each option becomes AUTH_CUSTOM_<OPTION> (snake->UPPER);
+    # scalars are bare strings, the secret uses secretKeyRef. Plaintext half
+    # lives in langfuse-secrets (oidc-client-secret); hashed half lives in
+    # authelia-oidc-client-langfuse (see infra authelia values + secrets below).
+    providers:
+      custom:
+        clientId: langfuse
+        clientSecret:
+          secretKeyRef:
+            name: langfuse-secrets
+            key: oidc-client-secret
+        issuer: https://auth.jvos.dev
+        name: Authelia
 web:
   deploy: true
 
