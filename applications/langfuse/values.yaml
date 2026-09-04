@@ -113,11 +113,17 @@ s3:
   region: garage
   endpoint: http://garage.garage:3900
   forcePathStyle: true
-  auth:
-    existingSecret: langfuse-secrets
-    secretKeys:
-      accessKeyIdKey: garage-access-key-id
-      secretAccessKeyKey: garage-secret-access-key
+  # s3.auth.existingSecret is only used when s3.deploy=true (bundled seaweedfs).
+  # For an external S3 (deploy:false), the chart reads credentials from
+  # s3.accessKeyId / s3.secretAccessKey via the getS3ValueOrSecret helper.
+  accessKeyId:
+    secretKeyRef:
+      name: langfuse-secrets
+      key: garage-access-key-id
+  secretAccessKey:
+    secretKeyRef:
+      name: langfuse-secrets
+      key: garage-secret-access-key
   batchExport:
     enabled: false
 
