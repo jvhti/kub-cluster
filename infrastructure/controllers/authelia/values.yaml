@@ -29,16 +29,37 @@ persistence:
   size: 500Mi # db.sqlite3 + notification.txt only — tiny, generous headroom over the chart's 100Mi default
 
 pod:
-  # Chart defaults to DaemonSet (one pod per node). Combined with
-  # configMap.storage.local (SQLite, local to each pod) that meant 3
-  # independent pods with independent databases and no shared session
-  # state, sitting behind a load-balanced Gateway — any multi-request flow
-  # (like the OIDC authorization code exchange) that landed on two
-  # different pods failed. Confirmed via a real login attempt: "error
-  # selecting oauth2 consent session ...: sql: no rows in result set".
-  # Single-replica Deployment fixes it — one pod, one DB, no cross-pod
-  # session issues (acceptable for a single-admin home-lab setup).
-  kind: 'Deployment'
+  # Single replica, one of the chart's three supported kinds (Deployment /
+  # DaemonSet / StatefulSet — see values.schema.json pod.kind).
+  #
+  # Why NOT DaemonSet (the chart default): combined with
+  # configMap.storage.local (SQLite, local to each pod) that meant one
+  # independent pod + DB per node with no shared session state, behind a
+  # load-balanced Gateway — any multi-request flow (like the OIDC
+  # authorization code exchange) that landed on two different pods failed.
+  # Confirmed via a real login attempt: "error selecting oauth2 consent
+  # session ...: sql: no rows in result set". Single replica = one pod, one
+  # DB, no cross-pod session issues (fine for a single-admin home-lab).
+  #
+  # Why StatefulSet and NOT Deployment: persistence.enabled (above) mounts an
+  # RWO Longhorn PVC at /config (db.sqlite3 + notification.txt). A
+  # Deployment + RWO PVC CANNOT roll — on a config change the new pod sits in
+  # ContainerCreating on a FailedAttachVolume Multi-Attach error (the RWO
+  # volume is still held by the old pod), while maxUnavailable=0 keeps the old
+  # pod alive, so the rollout deadlocks forever. This actually bit us: after
+  # the langfuse OIDC client was added to the config, the new pod was stuck
+  # on exactly this for ~5h while the OLD pod (started before the client
+  # existed, and Authelia does not hot-reload its config) kept serving →
+  # every langfuse SSO login got invalid_client until the old ReplicaSet was
+  # manually scaled to 0 to break the deadlock. A StatefulSet with
+  # replicas=1 never has more than one pod, so there is no second pod
+  # competing for the RWO volume; on update it deletes authelia-0, the PVC
+  # detaches and reattaches to the new authelia-0, and the rollout completes.
+  # Same single-replica semantics as the Deployment, but actually rollable.
+  # (serviceName defaults to the existing ClusterIP Service "authelia"; a
+  # non-headless serviceName is acceptable here since nothing relies on the
+  # per-pod stable DNS records that only a headless Service would provide.)
+  kind: 'StatefulSet'
   replicas: 1
   extraVolumes:
     - name: users-database
