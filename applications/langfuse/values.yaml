@@ -2,15 +2,17 @@
 # infrastructure (CNPG Postgres, shared ClickHouse, Valkey, Garage S3).
 # Chart: langfuse/langfuse v2.0.0 (v4 baseline).
 #
-# NOTE on structure: v2.0.0 reads the auth / nextauth / feature flags from the
-# top-level `langfuse:` block (NOT from flat top-level keys). The flat
-# `web` / `worker` / `postgres` / `auth` keys below are a leftover from the
-# older community-chart shape and are IGNORED by v2.0.0 — only `redis` /
-# `clickhouse` / `s3` (which ARE top-level in v2.0.0) actually take effect,
-# plus the `langfuse:` block added here for SSO. They're left as-is on purpose
-# to avoid touching the running bundled Postgres (langfuse-web's live
-# DATABASE_HOST is the chart's bundled `langfuse-postgresql`, not the separate
-# CNPG `langfuse-postgres-rw`).
+# NOTE on structure: chart v2.0.0 reads Postgres from the TOP-LEVEL `postgresql:`
+# key and auth/nextauth/feature flags from the `langfuse:` block. The old flat
+# `postgres:` / `auth:` keys (community-chart shape) were IGNORED by v2.0.0 —
+# which is why the chart silently deployed its bundled single-instance Postgres
+# (langfuse-postgresql) and auto-generated churning salt/encryption/nextauth
+# instead of using the CNPG cluster and the pinned secrets below. As of 2026-09-04
+# this file uses the correct v2.0.0 shape: `postgresql:` points at the CNPG
+# cluster (data migrated from the bundled instance) and salt/encryptionKey/
+# nextauth.secret are pinned to langfuse-secrets so ArgoCD syncs never rotate
+# them (rotating salt invalidates every API key; rotating encryptionKey makes
+# encrypted columns unreadable).
 langfuse:
   # Canonical public URL — required for SSO/OIDC. NextAuth builds the callback
   # URL ({NEXTAUTH_URL}/api/auth/callback/custom) and validates redirects from
@@ -18,6 +20,23 @@ langfuse:
   # SSO could not work.
   nextauth:
     url: https://langfuse.jvos.dev
+    # Pinned (not chart-generated) so ArgoCD syncs never rotate it — rotating it
+    # invalidates every active NextAuth session.
+    secret:
+      secretKeyRef:
+        name: langfuse-secrets
+        key: nextauth-secret
+  # Pinned (not chart-generated): rotating SALT re-hashes and invalidates every
+  # API key; rotating ENCRYPTION_KEY makes already-encrypted columns unreadable.
+  # Both live in langfuse-secrets (see secrets.yaml).
+  salt:
+    secretKeyRef:
+      name: langfuse-secrets
+      key: salt
+  encryptionKey:
+    secretKeyRef:
+      name: langfuse-secrets
+      key: encryption-key
   features:
     # Disable public sign-up / account creation. Users authenticate via the
     # Authelia OIDC provider below; existing email/password accounts still work.
@@ -48,17 +67,22 @@ worker:
 ingress:
   enabled: false
 
-postgres:
+# Postgres — the CNPG cluster (langfuse-postgres), NOT the chart's bundled
+# single-instance. deploy:false stops the bundled subchart (which used to be
+# silently deployed because the flat `postgres:` key was ignored); host points at
+# the CNPG read-write service. langfuse connects as user `langfuse` (password from
+# the CNPG-managed langfuse-postgres-app Secret, which does NOT churn). Existing
+# data (68 tables / 14MB) was migrated bundled -> CNPG on 2026-09-04.
+postgresql:
   deploy: false
   host: langfuse-postgres-rw
   port: 5432
-  database: langfuse
-  args: "?sslmode=disable"
   auth:
     username: langfuse
     existingSecret: langfuse-postgres-app
     secretKeys:
       userPasswordKey: password
+    database: langfuse
 
 clickhouse:
   deploy: false
@@ -97,9 +121,6 @@ s3:
   batchExport:
     enabled: false
 
-auth:
-  existingSecret: langfuse-secrets
-  secretKeys:
-    saltKey: salt
-    encryptionKey: encryption-key
-    nextauthSecretKey: nextauth-secret
+# (The old flat `auth:` block that pointed salt/encryption-key/nextauth-secret at
+# langfuse-secrets was ignored by v2.0.0. Those are now pinned via
+# langfuse.salt / langfuse.encryptionKey / langfuse.nextauth.secret above.)
