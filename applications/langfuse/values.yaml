@@ -14,6 +14,11 @@
 # them (rotating salt invalidates every API key; rotating encryptionKey makes
 # encrypted columns unreadable).
 langfuse:
+  # v4 default is events_only (S3 only, no ClickHouse writes) which has known
+  # UI bugs (sessions/users not displayed). dual writes to both ClickHouse + S3.
+  additionalEnv:
+    - name: LANGFUSE_MIGRATION_V4_WRITE_MODE
+      value: dual
   # Canonical public URL — required for SSO/OIDC. NextAuth builds the callback
   # URL ({NEXTAUTH_URL}/api/auth/callback/custom) and validates redirects from
   # it. Previously unset -> the chart defaulted to http://localhost:3000 and
