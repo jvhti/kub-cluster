@@ -70,9 +70,13 @@ spec:
                 secretKeyRef:
                   name: openwebui-pipelines-auth
                   key: password
-            # Pre-install the Langfuse v3 filter pipeline at container start.
-            - name: PIPELINES_URLS
-              value: https://raw.githubusercontent.com/open-webui/pipelines/main/examples/filters/langfuse_v3_filter_pipeline.py
+            # The Langfuse filter pipeline .py lives on the PVC (pre-installed).
+            # We do NOT use PIPELINES_URLS because the upstream version doesn't
+            # set user.id/session.id on child spans (only on the unexported root
+            # span), so Langfuse v4 never picks up sessions/users. Our patched
+            # copy (see pipelines/langfuse_v3_filter_pipeline.py in this repo)
+            # sets them on each observation. If the PVC is lost, re-install from
+            # the repo copy via: kubectl cp <patched-file> <pod>:/app/pipelines/
           ports:
             - containerPort: 9099
           volumeMounts:
