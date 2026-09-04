@@ -29,11 +29,11 @@ spec:
           command: ["/garage"]
           args:
             - server
+            - --config
+            - /etc/garage/garage.toml
             - --single-node
             - --default-bucket
           env:
-            - name: GARAGE_CONFIG
-              value: /etc/garage/garage.toml
             - name: GARAGE_DEFAULT_BUCKET
               valueFrom:
                 secretKeyRef:
