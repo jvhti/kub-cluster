@@ -63,12 +63,16 @@ spec:
               value: "true"
             - name: DEBUG_MODE
               value: "false"
-            # Pipelines' own auth (Open WebUI connects with this password).
-            - name: WEBUI_PASSWORD
+            # Pipelines' API key — Open WebUI uses this as the Bearer token
+            # when connecting to the Pipelines service.
+            - name: PIPELINES_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: openwebui-pipelines-auth
                   key: password
+            # Pre-install the Langfuse v3 filter pipeline at container start.
+            - name: PIPELINES_URLS
+              value: https://raw.githubusercontent.com/open-webui/pipelines/main/examples/filters/langfuse_v3_filter_pipeline.py
           ports:
             - containerPort: 9099
           volumeMounts:
