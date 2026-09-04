@@ -8,5 +8,6 @@ resources:
   - storage.yaml
   - postgres-cluster.yaml
   - openwebui.yaml
+  - pipelines.yaml
   - httproute.yaml
   # - secrets.yaml  # Real values created imperatively — see that file's comments.

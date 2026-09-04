@@ -1,0 +1,97 @@
+# OpenWebUI Pipelines (https://github.com/open-webui/pipelines) — sits
+# between Open WebUI and the LLM backend, running filter plugins (the
+# Langfuse observability filter) on every request/response.
+#
+# Open WebUI is configured (imperatively, via its admin API) to use this
+# service as an "OpenAI API" connection at http://openwebui-pipelines:9099/.
+# Pipelines then forwards to the real llama.cpp backend (configured in the
+# pipeline's own "pipelines" valve, not here).
+#
+# The Langfuse filter pipeline .py is installed imperatively via the
+# Pipelines HTTP API (POST /pipelines/install/url) after the pod is ready —
+# see secrets.yaml's comments for the full imperative runbook.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openwebui-pipelines-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openwebui-pipelines
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # RWO PVC
+  selector:
+    matchLabels:
+      app: openwebui-pipelines
+  template:
+    metadata:
+      labels:
+        app: openwebui-pipelines
+    spec:
+      containers:
+        - name: pipelines
+          image: ghcr.io/open-webui/pipelines:main
+          env:
+            - name: TZ
+              value: America/Sao_Paulo
+            # Langfuse filter pipeline reads these at load time (see the
+            # pipeline's Valves.__init__ — it falls back to os.getenv for
+            # each field). Host is the in-cluster Langfuse web service.
+            - name: LANGFUSE_HOST
+              value: http://langfuse-web.langfuse:3000
+            - name: LANGFUSE_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-langfuse
+                  key: public-key
+            - name: LANGFUSE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-langfuse
+                  key: secret-key
+            - name: USE_MODEL_NAME
+              value: "true"
+            - name: DEBUG_MODE
+              value: "false"
+            # Pipelines' own auth (Open WebUI connects with this password).
+            - name: WEBUI_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-pipelines-auth
+                  key: password
+          ports:
+            - containerPort: 9099
+          volumeMounts:
+            - name: data
+              mountPath: /app/pipelines
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: openwebui-pipelines-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openwebui-pipelines
+spec:
+  selector:
+    app: openwebui-pipelines
+  ports:
+    - port: 9099
+      targetPort: 9099
