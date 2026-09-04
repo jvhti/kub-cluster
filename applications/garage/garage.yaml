@@ -29,8 +29,6 @@ spec:
           command: ["/garage"]
           args:
             - server
-            - --config
-            - /etc/garage/garage.toml
             - --single-node
             - --default-bucket
           env:
@@ -64,7 +62,8 @@ spec:
             - name: data
               mountPath: /data/data
             - name: config
-              mountPath: /etc/garage
+              mountPath: /etc/garage.toml
+              subPath: garage.toml
               readOnly: true
       volumes:
         - name: meta
