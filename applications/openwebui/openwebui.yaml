@@ -1,5 +1,5 @@
 # Open WebUI (https://docs.openwebui.com) — chat frontend against a local
-# llama.cpp/Qwen server running on a separate LAN host (192.168.1.210:8090,
+# llama.cpp/Qwen server running on a separate LAN host (192.168.1.211:8090,
 # outside the cluster — no in-cluster networking needed, just outbound HTTP).
 # TTS is served by a Kokoro FastAPI server running on the same LXC
 # (192.168.1.18:8880) — see docs/local-llm-setups.md "TTS".
@@ -56,7 +56,7 @@ spec:
             # llama.cpp's server exposes an OpenAI-compatible API — same
             # backend/URL already used from opencode.json on this host.
             - name: OPENAI_API_BASE_URL
-              value: http://192.168.1.210:8090/v1
+              value: http://192.168.1.211:8090/v1
             # llama.cpp's server here takes no API key (opencode.json sends
             # none either). A non-empty placeholder is safer than leaving
             # this unset/empty — some OpenAI-compatible servers 400 on a
