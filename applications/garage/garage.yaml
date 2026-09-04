@@ -1,0 +1,93 @@
+# Garage S3-compatible object storage — single node, --default-bucket mode.
+# Serves Langfuse (ns langfuse) and the public s3.jvos.dev endpoint.
+#
+# Config: garage.toml is mounted from the garage-config Secret (see
+# secrets.yaml) at /etc/garage/garage.toml. The --single-node flag skips
+# multi-node cluster formation; --default-bucket auto-creates the bucket +
+# key named in the GARAGE_DEFAULT_* env vars on first boot (idempotent —
+# no-op if the bucket already exists).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: garage
+  namespace: garage
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: garage
+  template:
+    metadata:
+      labels:
+        app: garage
+    spec:
+      containers:
+        - name: garage
+          image: dxflrs/garage:v2.3.0
+          args:
+            - server
+            - --single-node
+            - --default-bucket
+          env:
+            - name: GARAGE_CONFIG
+              value: /etc/garage/garage.toml
+            - name: GARAGE_DEFAULT_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: garage-s3
+                  key: GARAGE_DEFAULT_BUCKET
+            - name: GARAGE_DEFAULT_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: garage-s3
+                  key: GARAGE_DEFAULT_ACCESS_KEY
+            - name: GARAGE_DEFAULT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: garage-s3
+                  key: GARAGE_DEFAULT_SECRET_KEY
+          ports:
+            - containerPort: 3900 # S3 API
+            - containerPort: 3903 # Admin API
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: meta
+              mountPath: /data/meta
+            - name: data
+              mountPath: /data/data
+            - name: config
+              mountPath: /etc/garage
+              readOnly: true
+      volumes:
+        - name: meta
+          persistentVolumeClaim:
+            claimName: garage-meta
+        - name: data
+          persistentVolumeClaim:
+            claimName: garage-data
+        - name: config
+          secret:
+            secretName: garage-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage
+  namespace: garage
+spec:
+  selector:
+    app: garage
+  ports:
+    - name: s3
+      port: 3900
+      targetPort: 3900
+    - name: admin
+      port: 3903
+      targetPort: 3903

@@ -1,0 +1,67 @@
+# Langfuse Helm chart values — all external deps pointed at shared
+# infrastructure (CNPG Postgres, shared ClickHouse, Valkey, Garage S3).
+# Chart: langfuse/langfuse v2.0.0 (v4 baseline).
+web:
+  deploy: true
+
+worker:
+  deploy: true
+
+ingress:
+  enabled: false
+
+postgres:
+  deploy: false
+  host: langfuse-postgres-rw
+  port: 5432
+  database: langfuse
+  args: "?sslmode=disable"
+  auth:
+    username: langfuse
+    existingSecret: langfuse-postgres-app
+    secretKeys:
+      userPasswordKey: password
+
+clickhouse:
+  deploy: false
+  host: clickhouse.clickhouse
+  httpPort: 8123
+  nativePort: 9000
+  database: default
+  crdCheck: false
+  cluster:
+    enabled: false
+  auth:
+    username: default
+    existingSecret: clickhouse-credentials
+    existingSecretKey: password
+
+redis:
+  deploy: false
+  host: langfuse-redis
+  port: 6379
+  auth:
+    username: default
+    existingSecret: langfuse-secrets
+    existingSecretPasswordKey: redis-password
+
+s3:
+  deploy: false
+  bucket: langfuse
+  region: garage
+  endpoint: http://garage.garage:3900
+  forcePathStyle: true
+  auth:
+    existingSecret: langfuse-secrets
+    secretKeys:
+      accessKeyIdKey: garage-access-key-id
+      secretAccessKeyKey: garage-secret-access-key
+  batchExport:
+    enabled: false
+
+auth:
+  existingSecret: langfuse-secrets
+  secretKeys:
+    saltKey: salt
+    encryptionKey: encryption-key
+    nextauthSecretKey: nextauth-secret

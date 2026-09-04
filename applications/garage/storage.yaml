@@ -1,0 +1,48 @@
+# Garage metadata (SQLite DB, cluster membership, key/bucket registry).
+# MUST be on local disk (Longhorn), never NFS — SQLite WAL mode on NFS
+# corrupts the database. Small: a few MB even with many keys/buckets.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: garage-meta
+  namespace: garage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
+---
+# Garage object data (actual S3 objects) on TrueNAS NFS — the bulk storage
+# lives off-cluster, same pattern as memos-assets / immich uploads.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: garage-data
+spec:
+  capacity:
+    storage: 1Ti # nominal — NFS doesn't enforce this, ZFS quota is the real limit
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: garage-data
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: 10.0.0.5
+    path: /mnt/General/garage/data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: garage-data
+  namespace: garage
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: garage-data
+  resources:
+    requests:
+      storage: 1Ti
+  volumeName: garage-data

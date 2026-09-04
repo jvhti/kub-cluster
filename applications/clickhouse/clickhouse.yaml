@@ -1,0 +1,77 @@
+# Shared ClickHouse — standalone Deployment (not the operator CRD path,
+# homelab scale, single node). Serves Langfuse (applications/langfuse/) and
+# any future app that needs a columnar store. The `default` user's password
+# is set via CLICKHOUSE_PASSWORD env (ClickHouse's entrypoint uses this to
+# set the default user's password at first boot; subsequent boots are a
+# no-op since the user already exists in the on-disk metadata).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clickhouse
+  namespace: clickhouse
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: clickhouse
+  template:
+    metadata:
+      labels:
+        app: clickhouse
+    spec:
+      containers:
+        - name: clickhouse
+          image: clickhouse/clickhouse-server:26.4
+          env:
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: clickhouse-credentials
+                  key: password
+          ports:
+            - containerPort: 8123 # HTTP interface (Langfuse uses this)
+            - containerPort: 9000 # native TCP interface
+          resources:
+            requests:
+              cpu: 200m
+              memory: 1Gi
+            limits:
+              memory: 4Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/clickhouse
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: clickhouse-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse
+  namespace: clickhouse
+spec:
+  selector:
+    app: clickhouse
+  ports:
+    - name: http
+      port: 8123
+      targetPort: 8123
+    - name: tcp
+      port: 9000
+      targetPort: 9000
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: clickhouse-data
+  namespace: clickhouse
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 50Gi

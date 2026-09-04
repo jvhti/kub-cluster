@@ -65,6 +65,8 @@ data:
             192.168.1.240 paste.jvos.dev
             192.168.1.240 draw.jvos.dev
             192.168.1.240 frigate.jvos.dev
+            192.168.1.240 langfuse.jvos.dev
+            192.168.1.240 s3.jvos.dev
             fallthrough
         }
         forward . /etc/resolv.conf

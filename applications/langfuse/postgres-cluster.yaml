@@ -1,0 +1,19 @@
+# Langfuse's Postgres — CNPG, same pattern as memos/degoog/immich.
+# Single instance, no HA. Langfuse connects as user `langfuse` to db
+# `langfuse` via the auto-created langfuse-postgres-app Secret.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: langfuse-postgres
+  namespace: langfuse
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17-bookworm
+  storage:
+    size: 20Gi
+    storageClass: longhorn
+  bootstrap:
+    initdb:
+      database: langfuse
+      owner: langfuse
+  enablePDB: false
