@@ -25,6 +25,14 @@ extraArgs:
   cookie-domain: search.jvos.dev
   whitelist-domain: .jvos.dev
   reverse-proxy: "true"
+  # oauth2-proxy's default --real-client-ip-header is X-Real-IP, but Cilium's
+  # Envoy Gateway (gateway-internal) sets X-Forwarded-For, not X-Real-IP —
+  # confirmed live: without this override, --trusted-ip matched against
+  # nothing meaningful (fell back to the immediate TCP peer, i.e. Envoy's own
+  # pod IP, for every request regardless of real client IP) and every
+  # request stayed gated. Must match whichever header the fronting proxy
+  # actually sets, per --reverse-proxy's own warning.
+  real-client-ip-header: X-Forwarded-For
   set-xauthrequest: "true"
   cookie-expire: 168h
   upstream: http://degoog.degoog.svc.cluster.local:4444
