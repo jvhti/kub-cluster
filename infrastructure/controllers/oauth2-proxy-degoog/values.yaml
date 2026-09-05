@@ -33,6 +33,22 @@ extraArgs:
   # request stayed gated. Must match whichever header the fronting proxy
   # actually sets, per --reverse-proxy's own warning.
   real-client-ip-header: X-Forwarded-For
+  # Pin who's allowed to set that header at all — otherwise --reverse-proxy
+  # trusts X-Forwarded-For from *any* connecting peer (its own documented
+  # default), meaning anything able to reach this Service directly
+  # in-cluster could forge the header and impersonate a --trusted-ip LAN
+  # client. Confirmed live (tcpdump on the node hosting the oauth2-proxy
+  # pod) that Cilium's Envoy Gateway proxies backend requests using a
+  # per-node `cilium_host` source address drawn from that node's pod-CIDR
+  # /24 (e.g. kub-ctrl-1 showed up as 10.42.0.102) — not a fixed IP, and not
+  # the same one every request, since which node's Envoy instance handles a
+  # given connection can vary. Trusting the whole cluster pod CIDR
+  # (10.42.0.0/16 - see `kubectl get nodes -o
+  # jsonpath='{.items[*].spec.podCIDR}'`, one /24 per node) is simpler and
+  # more stable across node rebuilds than chasing each node's actual
+  # cilium_host address, at the cost of trusting XFF from any pod, not just
+  # Envoy specifically — still a large tightening from the 0.0.0.0/0 default.
+  trusted-proxy-ip: 10.42.0.0/16
   set-xauthrequest: "true"
   cookie-expire: 168h
   upstream: http://degoog.degoog.svc.cluster.local:4444
