@@ -19,10 +19,12 @@ spec:
         # Routes through the degoog-dedicated oauth2-proxy instance instead
         # of straight to the degoog Service — this instance is public
         # (DEGOOG_PUBLIC_INSTANCE, degoog.yaml) so it gets the same
-        # Authelia-backed login gate as Longhorn. A SEPARATE oauth2-proxy
-        # instance from Longhorn's, not the same one — see
-        # infrastructure/controllers/oauth2-proxy-degoog/values.yaml for why
-        # one shared instance can't front two different hostnames. Needs the
+        # Authelia-backed login gate as Longhorn for internet clients. A
+        # SEPARATE oauth2-proxy instance from Longhorn's, not the same one —
+        # see infrastructure/controllers/oauth2-proxy-degoog/values.yaml for
+        # why one shared instance can't front two different hostnames, and
+        # for how that instance's --trusted-ip lets LAN clients skip the
+        # login gate entirely while still gating WAN traffic. Needs the
         # ReferenceGrant in that same directory (cross-namespace backendRef).
         - name: oauth2-proxy-degoog
           namespace: oauth2-proxy-degoog

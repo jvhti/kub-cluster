@@ -28,3 +28,31 @@ extraArgs:
   set-xauthrequest: "true"
   cookie-expire: 168h
   upstream: http://degoog.degoog.svc.cluster.local:4444
+  # Skip the Authelia login redirect entirely for LAN clients, keeping it for
+  # everyone else. Works because of how traffic actually arrives here:
+  # gateway-internal's VIP (192.168.1.240) sits directly on the LAN subnet
+  # (infrastructure/networking/gateway/gateway.yaml), so a real LAN client's
+  # TCP connection carries its own 192.168.1.x source IP straight through to
+  # Envoy, which sets X-Forwarded-For accordingly (reverse-proxy: "true"
+  # above makes oauth2-proxy honor it). Internet clients, by contrast, all
+  # arrive via the DMZ-forwarder LXC (infrastructure/dmz-forwarder/), whose
+  # HAProxy frontend does *TCP* passthrough for :443 (mode tcp, SNI-routed,
+  # no TLS termination, no `send-proxy`/header rewrite of any kind) — so
+  # every WAN request's visible source IP is the LXC's own
+  # 192.168.1.239, never the real internet client's IP.
+  #
+  # Net effect: trusting 192.168.1.0/24 would also cover .239 and thus wave
+  # through all WAN traffic unauthenticated, defeating the point. The list
+  # below is therefore the /24 with 192.168.1.239/32 carved out (via Python's
+  # ipaddress.ip_network.address_exclude) rather than the plain /24 — ugly,
+  # but avoids relying on the DMZ-forwarder LXC's IP never moving without a
+  # matching edit here. --trusted-ip lets requests from these ranges skip
+  # auth outright (not just skip-auth-preflight); see oauth2-proxy's own
+  # warning that trusting by IP is spoofable if X-Forwarded-For isn't
+  # actually locked down — it currently isn't (--trusted-proxy-ip is unset,
+  # so oauth2-proxy trusts XFF from any peer per its own default). Low risk
+  # here since Envoy (gateway-internal) is the only thing that can set that
+  # header before oauth2-proxy sees it — nothing upstream of it forwards a
+  # client-supplied XFF through untouched — but worth knowing if this is
+  # ever revisited.
+  trusted-ip: "192.168.1.0/25,192.168.1.128/26,192.168.1.192/27,192.168.1.224/29,192.168.1.232/30,192.168.1.236/31,192.168.1.238/32,192.168.1.240/28"
