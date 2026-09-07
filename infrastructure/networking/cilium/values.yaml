@@ -12,6 +12,17 @@ cgroup:
   autoMount:
     enabled: false
   hostRoot: /sys/fs/cgroup
+# Explicit device list instead of relying on auto-detection. Auto-detect walks
+# each node's interfaces/routes to guess the direct-routing device, and it
+# started failing hard on overkill ("unable to determine direct routing
+# device") once that node picked up extra local interfaces (docker0, several
+# br-* bridges, a down wlo1) alongside its real NIC enp4s0 — even though
+# enp4s0 still carries the one unambiguous default route there. Each node's
+# actual uplink name (confirmed live via `ip route show default`):
+#   kub-ctrl-1 -> eth0, kub-node-1 -> ens18, overkill -> enp4s0, pi1 -> eth0
+# This is a glob list evaluated per-node; entries that don't match a given
+# node's interfaces are simply ignored, so one shared list is safe here.
+devices: eth0,ens18,enp4s0
 # https://docs.cilium.io/en/stable/network/concepts/ipam/
 ipam:
   mode: kubernetes
