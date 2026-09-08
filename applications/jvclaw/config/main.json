@@ -14,5 +14,5 @@
     }
   },
   "daemon": { "listen": "0.0.0.0:7860" },
-  "tasksDb": "workspace/data/jvclaw.db"
+  "tasksDb": "data/jvclaw.db"
 }
