@@ -1,8 +1,10 @@
 # jvclawd — the headless jvclaw daemon (channels + agent loop + scheduler +
-# HTTP API on :7860, Prometheus metrics on :9090). Built by the Gitea Actions
+# HTTP API + Prometheus metrics, all on :7860). Built by the Gitea Actions
 # pipeline in the `jvclaw` repo (see docs/gitea-actions.md) and pushed to
-# gitea.jvos.dev/jvhti/jvclaw — the :f7a8d92 tag is the verified run-50 SHA
-# (never :latest; see the runners goal that produced it).
+# gitea.jvos.dev/jvhti/jvclaw. Tag is the short git SHA of each build (never
+# :latest); the build workflow's "Bump kub-cluster image tag" step rewrites
+# the image ref below to the just-pushed SHA and pushes to Gitea origin after
+# every successful build, then ArgoCD does the Recreate rollout.
 #
 # Single-replica by design: workspace/ holds a single-writer SQLite DB, so
 # replicas:1 + a Recreate strategy (a RollingUpdate would try to attach the RWO
