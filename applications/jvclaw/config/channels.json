@@ -1,0 +1,9 @@
+{
+  "http": { "enabled": true },
+  "telegram": {
+    "enabled": true,
+    "token": "env:TELEGRAM_BOT_TOKEN",
+    "allowedChatIds": [],
+    "promptFile": "prompts/telegram.txt"
+  }
+}

@@ -1,0 +1,87 @@
+# jvclawd — the headless jvclaw daemon (channels + agent loop + scheduler +
+# HTTP API on :7860, Prometheus metrics on :9090). Built by the Gitea Actions
+# pipeline in the `jvclaw` repo (see docs/gitea-actions.md) and pushed to
+# gitea.jvos.dev/jvhti/jvclaw — the :f7a8d92 tag is the verified run-50 SHA
+# (never :latest; see the runners goal that produced it).
+#
+# Single-replica by design: workspace/ holds a single-writer SQLite DB, so
+# replicas:1 + a Recreate strategy (a RollingUpdate would try to attach the RWO
+# Longhorn PVC to two pods at once — same reason as memos/memogram above).
+#
+# Config (main.json / models.json / channels.json / prompts/) is seeded onto
+# the PVC imperatively ONCE (the daemon hard-exits if main.json is missing —
+# internal/agent/config.go LoadConfig) — see docs/deployment/kubernetes.md in
+# the jvclaw repo. The config files live in this repo's config/ dir as the
+# source of truth for what gets copied.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jvclawd
+  namespace: jvclaw
+  labels:
+    app: jvclawd
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # RWO Longhorn workspace PVC — a RollingUpdate would attach it to two pods at once
+  selector:
+    matchLabels:
+      app: jvclawd
+  template:
+    metadata:
+      labels:
+        app: jvclawd
+    spec:
+      # gitea.jvos.dev 401s anonymous pulls — k3s needs this docker-registry
+      # Secret (same admin PAT as gitea-admin-pat). Created imperatively — see
+      # secrets.yaml.
+      imagePullSecrets:
+        - name: gitea-registry-pull
+      # The image is distroless nonroot (uid 65532) — fsGroup makes the
+      # Longhorn PVC group-writable by that uid so the SQLite DB + runtime
+      # agent/skill dirs are writable (same pattern as memogram.yaml).
+      securityContext:
+        fsGroup: 65532
+      containers:
+        - name: jvclawd
+          image: gitea.jvos.dev/jvhti/jvclaw:f7a8d92
+          ports:
+            - name: http
+              containerPort: 7860
+            - name: metrics
+              containerPort: 9090
+          # TELEGRAM_BOT_TOKEN (referenced as "env:TELEGRAM_BOT_TOKEN" in
+          # config/channels.json) + LANGFUSE_* (referenced by name in
+          # config/models.json observability). Secret created imperatively —
+          # see secrets.yaml.
+          envFrom:
+            - secretRef:
+                name: jvclawd-secrets
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          # /v1/health returns ok unconditionally — liveness-only, but it
+          # correctly catches a hung/crashed process for both probes.
+          livenessProbe:
+            httpGet:
+              path: /v1/health
+              port: 7860
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /v1/health
+              port: 7860
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: jvclawd-workspace

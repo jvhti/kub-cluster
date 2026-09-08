@@ -1,0 +1,18 @@
+# jvclawd's workspace/ — the single-writer SQLite DB (workspace/data/jvclaw.db,
+# see main.json tasksDb) plus the seeded config/ + prompts/ and the runtime
+# agent/skill dirs. ReadWriteOnce + replicas:1 + a Recreate strategy (see
+# deployment.yaml) keep it a single writer for the life of the volume.
+# Longhorn (block, RWO) is used over the NFS CSI driver on purpose — SQLite
+# file-locking has real caveats over NFS, so the DB stays on block storage.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jvclawd-workspace
+  namespace: jvclaw
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi

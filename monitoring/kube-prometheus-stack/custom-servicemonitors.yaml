@@ -110,3 +110,26 @@ spec:
     - port: metrics
       interval: 30s
       path: /metrics
+---
+# ServiceMonitor for jvclawd (the jvclaw daemon — applications/jvclaw). The
+# daemon exposes /metrics on :9090 (models.json observability.metrics).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: jvclawd-metrics
+  namespace: kube-prometheus-stack
+  labels:
+    app.kubernetes.io/name: jvclawd
+    release: prometheus
+    prometheus: prometheus-kube-prometheus-stack-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: jvclawd
+  namespaceSelector:
+    matchNames:
+      - jvclaw
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics

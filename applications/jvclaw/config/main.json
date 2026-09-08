@@ -1,0 +1,18 @@
+{
+  "_comment": "Template. Copy to workspace/config/main.json (git-ignored). Agent behaviour + the daemon's HTTP address. Model selection is by tag (see models.json / docs/architecture/model-layer.md). Channel selection lives in channels.json (see docs/architecture/channels.md). Secrets stay in models.json via env names.",
+  "agent": {
+    "systemPrompt": "You are jvclaw, a local-first personal assistant. Be concise and helpful.",
+    "model": { "type": "llm", "required": ["reason", "no-pii"], "excluded": [] },
+    "stream": true,
+    "affinity": true,
+    "tools": {
+      "enabled": ["web_fetch", "web_search"],
+      "acting": [],
+      "shellAllowed": [],
+      "webSearchBaseUrl": "https://search.jvos.dev",
+      "webFetchCmd": ""
+    }
+  },
+  "daemon": { "listen": "0.0.0.0:7860" },
+  "tasksDb": "workspace/data/jvclaw.db"
+}

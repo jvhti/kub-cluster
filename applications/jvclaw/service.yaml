@@ -1,0 +1,21 @@
+# jvclawd's HTTP API (:7860) + Prometheus metrics (:9090). No Ingress on
+# purpose — Telegram is an outbound long-poll (the daemon connects out, nothing
+# inbound on :7860), and the HTTP API is consumed via port-forward, not exposed
+# publicly. See docs/deployment/kubernetes.md in the jvclaw repo.
+apiVersion: v1
+kind: Service
+metadata:
+  name: jvclawd
+  namespace: jvclaw
+  labels:
+    app: jvclawd
+spec:
+  selector:
+    app: jvclawd
+  ports:
+    - name: http
+      port: 7860
+      targetPort: 7860
+    - name: metrics
+      port: 9090
+      targetPort: 9090

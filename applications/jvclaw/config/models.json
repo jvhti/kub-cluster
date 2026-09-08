@@ -1,0 +1,240 @@
+{
+  "providers": [
+    {
+      "id": "overkill",
+      "kind": "llamacpp-router",
+      "baseUrl": "http://192.168.1.211:8090",
+      "pollSec": 20,
+      "maxConcurrent": 6
+    },
+    {
+      "id": "proxmox",
+      "kind": "llamacpp-router",
+      "baseUrl": "http://192.168.1.18:8080",
+      "pollSec": 20,
+      "maxConcurrent": 3
+    },
+    {
+      "id": "kokoro",
+      "kind": "tts",
+      "baseUrl": "http://192.168.1.18:8880"
+    },
+    {
+      "id": "whisper",
+      "kind": "stt",
+      "baseUrl": "http://192.168.1.18:8890"
+    },
+    {
+      "id": "openai",
+      "kind": "openai-hosted",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "maxConcurrent": 20
+    }
+  ],
+  "models": [
+    {
+      "id": "gemma2-9b",
+      "type": "llm",
+      "provider": "overkill",
+      "wireModel": "dirty-muse-gemma2-9b",
+      "tags": [
+        "local",
+        "9b",
+        "fast",
+        "no-pii"
+      ],
+      "priority": 30,
+      "capabilities": [
+        "text"
+      ],
+      "maxContext": 8192
+    },
+    {
+      "id": "qwen3.6-27b",
+      "type": "llm",
+      "provider": "overkill",
+      "wireModel": "huihui-qwen3.6-27b",
+      "tags": [
+        "local",
+        "27b",
+        "quality",
+        "reason",
+        "no-pii"
+      ],
+      "priority": 20,
+      "capabilities": [
+        "text",
+        "reasoning"
+      ],
+      "maxContext": 32768
+    },
+    {
+      "id": "qwen3.8-27b",
+      "type": "llm",
+      "provider": "overkill",
+      "wireModel": "qwen3.8-27b",
+      "tags": [
+        "local",
+        "27b",
+        "quality",
+        "reason",
+        "no-pii"
+      ],
+      "priority": 15,
+      "capabilities": [
+        "text",
+        "reasoning"
+      ],
+      "maxContext": 131072
+    },
+    {
+      "id": "qwen3-8b",
+      "type": "llm",
+      "provider": "proxmox",
+      "wireModel": "qwen3-8b",
+      "tags": [
+        "local",
+        "8b",
+        "fast",
+        "no-pii"
+      ],
+      "priority": 30,
+      "capabilities": [
+        "text"
+      ],
+      "maxContext": 8192
+    },
+    {
+      "id": "qwen3.5-4b",
+      "type": "llm",
+      "provider": "proxmox",
+      "wireModel": "qwen3.5-4b",
+      "tags": [
+        "local",
+        "4b",
+        "tiny",
+        "fallback",
+        "no-pii",
+        "reason"
+      ],
+      "priority": 40,
+      "capabilities": [
+        "text"
+      ],
+      "maxContext": 104448
+    },
+    {
+      "id": "qwen3vl-2b",
+      "type": "vlm",
+      "provider": "proxmox",
+      "wireModel": "qwen3vl-2b",
+      "tags": [
+        "local",
+        "2b",
+        "vision",
+        "no-pii"
+      ],
+      "priority": 10,
+      "capabilities": [
+        "vision",
+        "text"
+      ],
+      "maxContext": 8192
+    },
+    {
+      "id": "kokoro-tts",
+      "type": "tts",
+      "provider": "kokoro",
+      "wireModel": "kokoro",
+      "tags": [
+        "local",
+        "no-pii"
+      ],
+      "priority": 10,
+      "voices": [
+        {
+          "name": "af_heart",
+          "tags": [
+            "en",
+            "default"
+          ],
+          "priority": 0
+        },
+        {
+          "name": "am_michael",
+          "tags": [
+            "en"
+          ],
+          "priority": 10
+        },
+        {
+          "name": "pf_dora",
+          "tags": [
+            "pt-br"
+          ],
+          "priority": 10
+        },
+        {
+          "name": "bf_emma",
+          "tags": [
+            "alarm",
+            "emergency"
+          ],
+          "priority": 20
+        }
+      ]
+    },
+    {
+      "id": "whisper-small",
+      "type": "stt",
+      "provider": "whisper",
+      "wireModel": "whisper-1",
+      "tags": [
+        "local",
+        "no-pii"
+      ],
+      "priority": 10,
+      "capabilities": [
+        "transcribe"
+      ]
+    },
+    {
+      "id": "gpt-5-nano",
+      "type": "llm",
+      "provider": "openai",
+      "wireModel": "gpt-5-nano",
+      "tags": [
+        "cloud",
+        "fallback",
+        "pii-ok"
+      ],
+      "priority": 100,
+      "capabilities": [
+        "text",
+        "vision",
+        "tool"
+      ],
+      "maxContext": 128000
+    }
+  ],
+  "observability": {
+    "metrics": {
+      "enabled": true,
+      "listen": "0.0.0.0:9090",
+      "path": "/metrics"
+    },
+    "langfuse": {
+      "enabled": true,
+      "baseUrl": "https://langfuse.jvos.dev",
+      "publicKeyEnv": "LANGFUSE_PUBLIC_KEY",
+      "secretKeyEnv": "LANGFUSE_SECRET_KEY"
+    },
+    "eval": {
+      "enabled": true,
+      "baseUrl": "https://langfuse.jvos.dev",
+      "publicKeyEnv": "LANGFUSE_EVAL_PUBLIC_KEY",
+      "secretKeyEnv": "LANGFUSE_EVAL_SECRET_KEY"
+    }
+  }
+}
