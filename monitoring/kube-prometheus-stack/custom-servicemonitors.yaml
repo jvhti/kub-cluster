@@ -112,7 +112,9 @@ spec:
       path: /metrics
 ---
 # ServiceMonitor for jvclawd (the jvclaw daemon — applications/jvclaw). The
-# daemon exposes /metrics on :9090 (models.json observability.metrics).
+# daemon serves /metrics on its single :7860 listener, same mux as /v1/* (it
+# binds one address, no separate metrics port — see jvclaw internal/daemon/
+# daemon.go registerDaemonRoutes).
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -130,6 +132,6 @@ spec:
     matchNames:
       - jvclaw
   endpoints:
-    - port: metrics
+    - port: http
       interval: 30s
       path: /metrics
