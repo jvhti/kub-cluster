@@ -23,7 +23,7 @@ metadata:
   labels:
     app: jvclawd
 spec:
-  replicas: 1
+  replicas: 0 # TEMPORARILY paused (2026-09-09) — set back to 1 to resume
   strategy:
     type: Recreate # RWO Longhorn workspace PVC — a RollingUpdate would attach it to two pods at once
   selector:
