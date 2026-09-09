@@ -46,7 +46,7 @@ spec:
         fsGroup: 65532
       containers:
         - name: jvclawd
-          image: gitea.jvos.dev/jvhti/jvclaw:aaeeb7b
+          image: gitea.jvos.dev/jvhti/jvclaw:7bdc990
           ports:
             # The daemon binds ONE listener (d.listen, 0.0.0.0:7860) for /v1/*,
             # GET /metrics and the OpenAPI spec — same mux, no separate metrics
