@@ -6,13 +6,18 @@
     "stream": true,
     "affinity": true,
     "tools": {
-      "enabled": ["web_fetch", "web_search"],
-      "acting": [],
+      "enabled": ["web_fetch", "web_search", "shell"],
+      "acting": ["shell"],
       "shellAllowed": [],
       "webSearchBaseUrl": "https://search.jvos.dev",
       "webFetchCmd": ""
     }
   },
   "daemon": { "listen": "0.0.0.0:7860" },
+  "shell": {
+    "enabled": true,
+    "defaultMode": "ask",
+    "_comment": "ask-permission policy ON (see docs/architecture/sandbox.md): every unmatched shell command bubbles an approval to the human's root session. defaultMode=ask = unmatched commands ask; add allow/deny command prefixes to change which auto-pass or auto-block."
+  },
   "tasksDb": "data/jvclaw.db"
 }
