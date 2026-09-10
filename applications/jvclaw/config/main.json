@@ -9,7 +9,7 @@
       "enabled": ["web_fetch", "web_search", "shell"],
       "acting": ["shell"],
       "shellAllowed": [],
-      "webSearchBaseUrl": "https://search.jvos.dev",
+      "webSearchBaseUrl": "http://degoog.degoog.svc.cluster.local:4444",
       "webFetchCmd": ""
     }
   },

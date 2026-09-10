@@ -256,7 +256,7 @@
       "secretKeyEnv": "LANGFUSE_SECRET_KEY"
     },
     "eval": {
-      "enabled": true,
+      "enabled": false,
       "baseUrl": "http://langfuse-web.langfuse.svc.cluster.local:3000",
       "publicKeyEnv": "LANGFUSE_EVAL_PUBLIC_KEY",
       "secretKeyEnv": "LANGFUSE_EVAL_SECRET_KEY"
