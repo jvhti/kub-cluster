@@ -19,6 +19,16 @@ langfuse:
   additionalEnv:
     - name: LANGFUSE_MIGRATION_V4_WRITE_MODE
       value: dual
+    # The MCP endpoint validates the request's Host header against
+    # NEXTAUTH_URL (https://langfuse.jvos.dev) and 403s anything else by
+    # default. In-cluster callers (e.g. jvclaw, see
+    # applications/jvclaw/config/models.json's observability.langfuse/eval
+    # baseUrl) reach Langfuse via the in-cluster Service DNS name instead —
+    # same hairpin-NAT reasoning as that commit — so their Host header is
+    # langfuse-web.langfuse.svc.cluster.local:3000, not the public hostname.
+    # Docs: exact hostnames/origins only, no wildcards/paths/scheme.
+    - name: LANGFUSE_MCP_ALLOWED_HOSTS
+      value: langfuse-web.langfuse.svc.cluster.local:3000
   # Canonical public URL — required for SSO/OIDC. NextAuth builds the callback
   # URL ({NEXTAUTH_URL}/api/auth/callback/custom) and validates redirects from
   # it. Previously unset -> the chart defaulted to http://localhost:3000 and
