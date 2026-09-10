@@ -10,11 +10,12 @@
 # replicas:1 + a Recreate strategy (a RollingUpdate would try to attach the RWO
 # Longhorn PVC to two pods at once — same reason as memos/memogram above).
 #
-# Config (main.json / models.json / channels.json / prompts/) is seeded onto
-# the PVC imperatively ONCE (the daemon hard-exits if main.json is missing —
-# internal/agent/config.go LoadConfig) — see docs/deployment/kubernetes.md in
-# the jvclaw repo. The config files live in this repo's config/ dir as the
-# source of truth for what gets copied.
+# Config (main.json / models.json / channels.json / prompts/) ships baked into
+# the jvclaw-customized image at /opt/jvclaw-workspace-seed and is copied onto
+# the PVC by the seed-workspace initContainer on every start (the daemon
+# hard-exits if main.json is missing — internal/agent/config.go LoadConfig).
+# This repo's config/ dir is the source of truth for what gets baked in: it is
+# copied into the jvclaw-customized repo's workspace/ and the image's seed.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -44,6 +45,28 @@ spec:
       # agent/skill dirs are writable (same pattern as memogram.yaml).
       securityContext:
         fsGroup: 65532
+      # Seed the workspace PVC on every start. The customized image bakes the
+      # config + prompts at /opt/jvclaw-workspace-seed (jvclaw-customized repo);
+      # this initContainer copies them onto the PVC each start, replacing the
+      # old imperative one-time seeding. It runs as the image's non-root user
+      # (65532) — it only writes to the fsGroup-owned volume, so no root needed.
+      # The mkdir + `cp -a` only add/update the seed's config + prompts; the
+      # data/agent/skills dirs (SQLite DB, runtime state) persist untouched.
+      # No-op if the seed dir is absent (still on the plain jvclaw base image
+      # before the first customized build).
+      initContainers:
+        - name: seed-workspace
+          # Bumped in lockstep with the main container by the jvclaw-customized
+          # workflow's "Bump kub-cluster image tag" step (its sed rewrites every
+          # `jvclaw[-customized]:<sha>` ref in this file to the new tag).
+          image: gitea.jvos.dev/jvhti/jvclaw:2e1ebc7
+          command: ["sh", "-c"]
+          args:
+            - |
+              mkdir -p /workspace/data /workspace/agent /workspace/skills
+              if [ -d /opt/jvclaw-workspace-seed ]; then
+                cp -a /opt/jvclaw-workspace-seed/. /workspace/
+              fi
       containers:
         - name: jvclawd
           image: gitea.jvos.dev/jvhti/jvclaw:2e1ebc7
