@@ -25,6 +25,13 @@
       "baseUrl": "http://192.168.1.18:8890"
     },
     {
+      "id": "bge-embedding",
+      "kind": "llamacpp-router",
+      "baseUrl": "http://192.168.1.18:8081",
+      "pollSec": 20,
+      "maxConcurrent": 2
+    },
+    {
       "id": "openai",
       "kind": "openai-hosted",
       "baseUrl": "https://api.openai.com/v1",
@@ -60,7 +67,8 @@
         "27b",
         "quality",
         "reason",
-        "no-pii"
+        "no-pii",
+        "auto-perm:10"
       ],
       "priority": 20,
       "capabilities": [
@@ -79,7 +87,8 @@
         "27b",
         "quality",
         "reason",
-        "no-pii"
+        "no-pii",
+        "auto-perm:10"
       ],
       "priority": 15,
       "capabilities": [
@@ -116,7 +125,8 @@
         "tiny",
         "fallback",
         "no-pii",
-        "reason"
+        "reason",
+        "auto-perm:5"
       ],
       "priority": 40,
       "capabilities": [
@@ -197,6 +207,21 @@
       "priority": 10,
       "capabilities": [
         "transcribe"
+      ]
+    },
+    {
+      "id": "bge-m3",
+      "type": "embedding",
+      "provider": "bge-embedding",
+      "wireModel": "bge-m3",
+      "tags": [
+        "local",
+        "multilingual",
+        "no-pii"
+      ],
+      "priority": 10,
+      "capabilities": [
+        "embed"
       ]
     },
     {
