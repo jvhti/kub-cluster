@@ -251,13 +251,13 @@
     },
     "langfuse": {
       "enabled": true,
-      "baseUrl": "https://langfuse.jvos.dev",
+      "baseUrl": "http://langfuse-web.langfuse.svc.cluster.local:3000",
       "publicKeyEnv": "LANGFUSE_PUBLIC_KEY",
       "secretKeyEnv": "LANGFUSE_SECRET_KEY"
     },
     "eval": {
       "enabled": true,
-      "baseUrl": "https://langfuse.jvos.dev",
+      "baseUrl": "http://langfuse-web.langfuse.svc.cluster.local:3000",
       "publicKeyEnv": "LANGFUSE_EVAL_PUBLIC_KEY",
       "secretKeyEnv": "LANGFUSE_EVAL_SECRET_KEY"
     }
