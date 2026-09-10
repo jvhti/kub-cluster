@@ -79,4 +79,14 @@ extraArgs:
   # header before oauth2-proxy sees it — nothing upstream of it forwards a
   # client-supplied XFF through untouched — but worth knowing if this is
   # ever revisited.
-  trusted-ip: "192.168.1.0/25,192.168.1.128/26,192.168.1.192/27,192.168.1.224/29,192.168.1.232/30,192.168.1.236/31,192.168.1.238/32,192.168.1.240/28"
+  #
+  # Also includes 10.42.0.0/16 (the whole in-cluster pod CIDR, same range
+  # already trusted for XFF spoofing via trusted-proxy-ip above) so
+  # in-cluster clients like jvclaw (applications/jvclaw/) can call
+  # search.jvos.dev without going through the Authelia browser-redirect
+  # login flow -- an in-cluster caller can't do an interactive OIDC
+  # redirect anyway, same reasoning as degoog-mcp's HTTPRoute
+  # (applications/degoog/mcp-httproute.yaml) being unauthenticated. Unlike
+  # the MCP route, this only skips auth for pod-sourced traffic -- WAN/LAN
+  # gating for browser clients on search.jvos.dev is unchanged.
+  trusted-ip: "192.168.1.0/25,192.168.1.128/26,192.168.1.192/27,192.168.1.224/29,192.168.1.232/30,192.168.1.236/31,192.168.1.238/32,192.168.1.240/28,10.42.0.0/16"
