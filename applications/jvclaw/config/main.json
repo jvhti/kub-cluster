@@ -17,7 +17,11 @@
   "shell": {
     "enabled": true,
     "defaultMode": "ask",
-    "_comment": "ask-permission policy ON (see docs/architecture/sandbox.md): every unmatched shell command bubbles an approval to the human's root session. defaultMode=ask = unmatched commands ask; add allow/deny command prefixes to change which auto-pass or auto-block."
+    "_comment": "ask-permission policy ON (see docs/architecture/sandbox.md): every unmatched shell command bubbles an approval to the human's root session. defaultMode=ask = unmatched commands ask; add allow/deny command prefixes to change which auto-pass or auto-block.",
+    "auto": {
+      "enabled": true,
+      "_comment": "LLM auto-approver ON: the classifier (shell.auto.model, default = the agent's primary) decides unmatched shell commands before paging the human. A benign command runs; a flagged one is denied (deny-and-continue) and, past the backstop, escalates to a human ask."
+    }
   },
   "tasksDb": "data/jvclaw.db"
 }
