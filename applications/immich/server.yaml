@@ -22,6 +22,20 @@ spec:
         runAsUser: 568
         runAsGroup: 568
         fsGroup: 568
+      # kub-node-1 (a KVM VM with an emulated HDD) is chronically CPU/disk
+      # saturated, so immich-server crashlooped there for hours (couldn't
+      # load node_modules inside the liveness window). Steer it off that node
+      # to wherever has headroom (overkill today). Not pinned — overkill may
+      # go down. /data is on NFS (TrueNAS), so no local state ties it to a node.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - kub-node-1
       containers:
         - name: immich-server
           image: ghcr.io/immich-app/immich-server:v3.1.0
@@ -70,6 +84,18 @@ spec:
               port: 2283
             initialDelaySeconds: 30
             periodSeconds: 20
+          # kub-node-1 (a KVM VM with an emulated HDD) is chronically
+          # CPU/disk-saturated, so booting the Node.js server (loading
+          # node_modules = thousands of small reads) can exceed the old
+          # ~90s liveness window and crashloop forever. A startupProbe lets
+          # it take up to 5min to boot; once it answers, liveness/readiness
+          # gate it as normal.
+          startupProbe:
+            httpGet:
+              path: /api/server/ping
+              port: 2283
+            periodSeconds: 10
+            failureThreshold: 30
       volumes:
         - name: uploads
           persistentVolumeClaim:
