@@ -9,4 +9,5 @@ resources:
   - config.yaml
   - gatus.yaml
   - httproute.yaml
+  - k8s-pod-check-rbac.yaml
   # - secrets.yaml  # Real values created imperatively — see that file's comments.

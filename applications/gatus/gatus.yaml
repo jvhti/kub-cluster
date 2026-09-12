@@ -34,6 +34,10 @@ spec:
       labels:
         app: gatus
     spec:
+      # Read-only pod status in the tailscale-router/wireguard namespaces —
+      # powers config.yaml's "VPN" group (K8s API is the health source there;
+      # see k8s-pod-check-rbac.yaml).
+      serviceAccountName: gatus-k8s-checker
       # Steer this pod off overkill until that's root-caused; remove once
       # confirmed fixed. Every pod scheduled there hits an identical, 100%
       # reproducible timeout dialing out to the Gateway VIP
@@ -76,6 +80,14 @@ spec:
                 secretKeyRef:
                   name: gatus-secrets
                   key: oidc-client-secret
+            # Long-lived token for the gatus-k8s-checker ServiceAccount —
+            # created imperatively, see secrets.yaml for the exact command
+            # and rotation procedure (5y duration).
+            - name: K8S_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gatus-k8s-api-token
+                  key: token
           ports:
             - containerPort: 8080
           volumeMounts:

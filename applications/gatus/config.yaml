@@ -246,6 +246,47 @@ data:
         conditions:
           - "[STATUS] == 200"
 
+      # VPN data plane — the VPN is NOT headscale (that's the control
+      # plane, covered by the headscale/headscale-admin entries above):
+      # tailscale-router (subnet router + exit node) and wireguard
+      # (break-glass UDP fallback). Neither has an HTTP/TCP endpoint to
+      # probe — the tailnet 100.x overlay isn't routable from cluster
+      # pods, and wireguard is UDP-only — so these query the Kubernetes
+      # API directly (gatus-k8s-checker ServiceAccount, see
+      # k8s-pod-check-rbac.yaml; token via ${K8S_API_TOKEN}) and check the
+      # pod reports ready. allow-insecure skips TLS verification of the
+      # in-cluster API server CA.
+      #
+      # Caveats (both documented, neither fixable from in-cluster):
+      # 1. Neither VPN pod defines a readiness probe, so "ready" means
+      #    "container is running" — a tailscale/WG pod that's up but
+      #    disconnected from its network would still read healthy here.
+      # 2. A true data-path test (a real client connecting through the
+      #    exit node / completing a WG handshake) is only possible from
+      #    outside the cluster — this catches crash-loops/OOM-kills/scheduling
+      #    failures, not silent disconnects.
+      #    (The router has a documented 130x crash-loop history, which is
+      #    exactly the failure class this catches.)
+      - name: tailscale-router (vpn)
+        group: VPN
+        url: "https://kubernetes.default.svc/api/v1/namespaces/tailscale-router/pods?labelSelector=app%3Dtailscale-router"
+        headers:
+          Authorization: "Bearer ${K8S_API_TOKEN}"
+        allow-insecure: true
+        interval: 1m
+        conditions:
+          - "[BODY] CONTAINS '\"ready\":true'"
+
+      - name: wireguard (vpn)
+        group: VPN
+        url: "https://kubernetes.default.svc/api/v1/namespaces/wireguard/pods?labelSelector=app%3Dwireguard"
+        headers:
+          Authorization: "Bearer ${K8S_API_TOKEN}"
+        allow-insecure: true
+        interval: 1m
+        conditions:
+          - "[BODY] CONTAINS '\"ready\":true'"
+
       - name: gateway-internal VIP
         url: "tcp://192.168.1.240:443"
         interval: 1m
