@@ -75,9 +75,29 @@ langfuse:
         name: Authelia
 web:
   deploy: true
+  # Startup (Prisma check + Next.js 16 boot + ClickHouse compatibility
+  # resolution) takes ~50-70s cold. The chart's default liveness/readiness
+  # (initialDelaySeconds: 20, failureThreshold: 3) kills the pod at ~50s —
+  # before the server binds :3000 — so it never came Ready (SIGTERM/143
+  # crash-loop, ~172 restarts over 27h observed 2026-09-12). A debug pod with
+  # identical env and no probes came up healthy in ~90s, confirming slow
+  # startup (not a dependency/config failure) was the cause. Probe timings
+  # below give ~3min of grace; once up, the probes run on their normal
+  # 10s period.
+  livenessProbe:
+    initialDelaySeconds: 120
+    failureThreshold: 6
+  readinessProbe:
+    initialDelaySeconds: 120
+    failureThreshold: 6
 
 worker:
   deploy: true
+  # Same slow-startup story as the web container (same image, runs the same
+  # ClickHouse/Prisma init) — same grace extension.
+  livenessProbe:
+    initialDelaySeconds: 120
+    failureThreshold: 6
 
 ingress:
   enabled: false
