@@ -1,7 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: gatus
+# NOTE: no global `namespace: gatus` transform — every resource declares its
+# own namespace explicitly (including k8s-pod-check-rbac.yaml's cross-
+# namespace Role/RoleBinding in tailscale-router/wireguard; a global
+# namespace transform would force those into `gatus` and produce an ID
+# conflict, same reason the oauth2-proxy-* dirs set namespaces per-resource).
 
 resources:
   - namespace.yaml
