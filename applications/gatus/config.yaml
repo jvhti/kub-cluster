@@ -190,6 +190,62 @@ data:
         conditions:
           - "[STATUS] == 200"
 
+      # Same oauth2-proxy /ping reasoning as longhorn/memos/search above —
+      # frigate (on TrueNAS) and picoclaw each sit behind their own
+      # dedicated oauth2-proxy instance (see
+      # infrastructure/controllers/oauth2-proxy-frigate/ and
+      # -picoclaw/).
+      - name: frigate
+        url: "https://frigate.jvos.dev/ping"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: picoclaw
+        url: "https://picoclaw.jvos.dev/ping"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      # Garage is an S3 API with no public HTML page and no anonymous
+      # access — GET / always answers 403 AccessDenied ("Garage does not
+      # support anonymous access yet"). That 403 is the healthy response
+      # here: it proves the gateway + garage backend are up and answering,
+      # exactly like the oauth2-proxy /ping entries do for the auth-gated
+      # apps.
+      - name: garage (s3)
+        url: "https://s3.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 403"
+
+      # Gatus monitoring itself — status.jvos.dev serves its 200 HTML
+      # shell even unauthenticated (the OIDC gate only protects the
+      # actual data), so a plain 200 check works.
+      - name: gatus (this page)
+        url: "https://status.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: draw (excalidash)
+        url: "https://draw.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: langfuse
+        url: "https://langfuse.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: paste (rustypaste)
+        url: "https://paste.jvos.dev"
+        interval: 1m
+        conditions:
+          - "[STATUS] == 200"
+
       - name: gateway-internal VIP
         url: "tcp://192.168.1.240:443"
         interval: 1m
