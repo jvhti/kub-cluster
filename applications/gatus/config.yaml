@@ -269,7 +269,7 @@ data:
       #    exactly the failure class this catches.)
       - name: tailscale-router (vpn)
         group: VPN
-        url: "http://hdrcap:8080"  # TEMP-DEBUG
+        url: "https://kubernetes.default.svc/api/v1/namespaces/tailscale-router/pods?labelSelector=app%3Dtailscale-router"
         headers:
           Authorization: "Bearer ${K8S_API_TOKEN}"
         allow-insecure: true
