@@ -1,15 +1,14 @@
-# ServiceAccount + minimal RBAC so Gatus can query the Kubernetes API
-# directly for pod readiness — used by the "VPN" group in config.yaml
-# (tailscale-router and wireguard have no HTTP/TCP endpoint to probe: the
-# tailnet 100.x overlay isn't routable from cluster pods, and wireguard is
-# UDP-only, so the K8s pod status IS the health signal here).
+# ServiceAccount + minimal RBAC so the gatus pod's vpn-sidecar (gatus.yaml)
+# can query the Kubernetes API for pod readiness — powers the "VPN" group in
+# config.yaml (tailscale-router and wireguard have no HTTP/TCP endpoint to
+# probe: the tailnet 100.x overlay isn't routable from cluster pods, and
+# wireguard is UDP-only, so the K8s pod status IS the health signal here).
 #
 # Deliberately scoped to read-only `get`/`list` on `pods` in exactly the
-# two namespaces Gatus checks — nothing else.
+# two namespaces the sidecar checks — nothing else.
 #
-# The long-lived token this SA uses is created imperatively (never
-# committed) — see secrets.yaml's gatus-k8s-api-token comment for the
-# exact command and rotation procedure.
+# The sidecar authenticates with this SA's own auto-mounted token (rotated
+# by the kubelet, always fresh) — no long-lived token or secret to manage.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
