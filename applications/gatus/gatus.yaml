@@ -35,8 +35,11 @@ spec:
         app: gatus
     spec:
       # Read-only pod status in the tailscale-router/wireguard namespaces —
-      # powers config.yaml's "VPN" group (K8s API is the health source there;
-      # see k8s-pod-check-rbac.yaml).
+      # used by the vpn-sidecar container (below) to check the VPN pods'
+      # readiness via the K8s API and serve a plain HTTP health endpoint
+      # that gatus monitors (see k8s-pod-check-rbac.yaml +
+      # vpn-check-configmap.yaml). The sidecar uses the pod's own
+      # auto-mounted ServiceAccount token — no static token/secret needed.
       serviceAccountName: gatus-k8s-checker
       # Steer this pod off overkill until that's root-caused; remove once
       # confirmed fixed. Every pod scheduled there hits an identical, 100%
@@ -80,14 +83,6 @@ spec:
                 secretKeyRef:
                   name: gatus-secrets
                   key: oidc-client-secret
-            # Long-lived token for the gatus-k8s-checker ServiceAccount —
-            # created imperatively, see secrets.yaml for the exact command
-            # and rotation procedure (5y duration).
-            - name: K8S_API_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: gatus-k8s-api-token
-                  key: token
           ports:
             - containerPort: 8080
           volumeMounts:
@@ -107,10 +102,41 @@ spec:
             periodSeconds: 20
             timeoutSeconds: 10
             failureThreshold: 5
+        # vpn-sidecar: checks the tailscale-router/wireguard pods via the K8s
+        # API (using this pod's own ServiceAccount token) and serves a plain
+        # HTTP health endpoint on :8090 that gatus's "VPN" group monitors.
+        # See vpn-check-configmap.yaml for the script and why not a direct
+        # gatus -> K8s API token call.
+        - name: vpn-sidecar
+          image: python:3-alpine
+          command: ["python", "/vpn-check/check.py"]
+          ports:
+            - containerPort: 8090
+          volumeMounts:
+            - name: vpn-check
+              mountPath: /vpn-check
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 5
       volumes:
         - name: config
           configMap:
             name: gatus-config
+        - name: vpn-check
+          configMap:
+            name: gatus-vpn-check
 ---
 apiVersion: v1
 kind: Service

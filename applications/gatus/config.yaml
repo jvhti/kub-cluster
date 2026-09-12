@@ -251,11 +251,13 @@ data:
       # tailscale-router (subnet router + exit node) and wireguard
       # (break-glass UDP fallback). Neither has an HTTP/TCP endpoint to
       # probe — the tailnet 100.x overlay isn't routable from cluster
-      # pods, and wireguard is UDP-only — so these query the Kubernetes
-      # API directly (gatus-k8s-checker ServiceAccount, see
-      # k8s-pod-check-rbac.yaml; token via ${K8S_API_TOKEN}) and check the
-      # pod reports ready. allow-insecure skips TLS verification of the
-      # in-cluster API server CA.
+      # pods, and wireguard is UDP-only — so the vpn-sidecar container
+      # (gatus.yaml) does the K8s API check (gatus-k8s-checker
+      # ServiceAccount, see k8s-pod-check-rbac.yaml) using the pod's own
+      # auto-mounted token and serves a plain HTTP health endpoint on
+      # localhost:8090; these entries just poll that endpoint. The sidecar
+      # (not gatus) talks to the API, so no token handling lives in gatus's
+      # config at all.
       #
       # Caveats (both documented, neither fixable from in-cluster):
       # 1. Neither VPN pod defines a readiness probe, so "ready" means
@@ -269,27 +271,19 @@ data:
       #    exactly the failure class this catches.)
       - name: tailscale-router (vpn)
         group: VPN
-        url: "https://kubernetes.default.svc/api/v1/namespaces/tailscale-router/pods?labelSelector=app%3Dtailscale-router"
-        headers:
-          Authorization: "Bearer ${K8S_API_TOKEN}"
-        allow-insecure: true
+        # vpn-sidecar (same pod) checks the tailscale-router pod's readiness
+        # via the K8s API and returns 200 (ready) / 503 (not ready).
+        url: "http://localhost:8090/tailscale"
         interval: 1m
-        # BODY-JSON + JSONPath (not [BODY] CONTAINS — the literal substring
-        # "ready":true needs nested YAML+Gatus quoting that Gatus's condition
-        # parser rejects). labelSelector guarantees exactly one item, so
-        # items[0]/containerStatuses[0] are stable.
         conditions:
-          - "[BODY-JSON:.items[0].status.containerStatuses[0].ready] == true"
+          - "[STATUS] == 200"
 
       - name: wireguard (vpn)
         group: VPN
-        url: "https://kubernetes.default.svc/api/v1/namespaces/wireguard/pods?labelSelector=app%3Dwireguard"
-        headers:
-          Authorization: "Bearer ${K8S_API_TOKEN}"
-        allow-insecure: true
+        url: "http://localhost:8090/wireguard"
         interval: 1m
         conditions:
-          - "[BODY-JSON:.items[0].status.containerStatuses[0].ready] == true"
+          - "[STATUS] == 200"
 
       - name: gateway-internal VIP
         url: "tcp://192.168.1.240:443"
