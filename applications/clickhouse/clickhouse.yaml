@@ -21,20 +21,6 @@ spec:
       labels:
         app: clickhouse
     spec:
-      # kub-node-1 is chronically CPU/disk-saturated (KVM VM with an emulated
-      # HDD); clickhouse is a heavy disk reader/writer and was both slowing
-      # the node and suffering from it. Steer it off that node to wherever has
-      # headroom (overkill today). Not pinned — overkill may go down. The 50Gi
-      # RWO longhorn PVC follows the pod on reschedule.
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: kubernetes.io/hostname
-                    operator: NotIn
-                    values:
-                      - kub-node-1
       containers:
         - name: clickhouse
           image: clickhouse/clickhouse-server:26.4

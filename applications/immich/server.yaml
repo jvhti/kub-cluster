@@ -22,20 +22,6 @@ spec:
         runAsUser: 568
         runAsGroup: 568
         fsGroup: 568
-      # kub-node-1 (a KVM VM with an emulated HDD) is chronically CPU/disk
-      # saturated, so immich-server crashlooped there for hours (couldn't
-      # load node_modules inside the liveness window). Steer it off that node
-      # to wherever has headroom (overkill today). Not pinned — overkill may
-      # go down. /data is on NFS (TrueNAS), so no local state ties it to a node.
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: kubernetes.io/hostname
-                    operator: NotIn
-                    values:
-                      - kub-node-1
       containers:
         - name: immich-server
           image: ghcr.io/immich-app/immich-server:v3.1.0
