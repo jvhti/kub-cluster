@@ -274,8 +274,12 @@ data:
           Authorization: "Bearer ${K8S_API_TOKEN}"
         allow-insecure: true
         interval: 1m
+        # BODY-JSON + JSONPath (not [BODY] CONTAINS — the literal substring
+        # "ready":true needs nested YAML+Gatus quoting that Gatus's condition
+        # parser rejects). labelSelector guarantees exactly one item, so
+        # items[0]/containerStatuses[0] are stable.
         conditions:
-          - "[BODY] CONTAINS '\"ready\":true'"
+          - "[BODY-JSON:.items[0].status.containerStatuses[0].ready] == true"
 
       - name: wireguard (vpn)
         group: VPN
@@ -285,7 +289,7 @@ data:
         allow-insecure: true
         interval: 1m
         conditions:
-          - "[BODY] CONTAINS '\"ready\":true'"
+          - "[BODY-JSON:.items[0].status.containerStatuses[0].ready] == true"
 
       - name: gateway-internal VIP
         url: "tcp://192.168.1.240:443"
