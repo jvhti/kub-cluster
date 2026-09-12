@@ -1,0 +1,17 @@
+# Pull-through cache storage: registry:2 caches Docker Hub blobs here.
+#
+# This is a CACHE, not source-of-truth data — if it ever fills up or you want
+# to start fresh, `kubectl delete pvc -n registry registry-data` (and let it
+# re-create) clears it; the cache rebuilds on demand. To grow it in place,
+# longhorn supports online PVC expansion (edit requests.storage + the PVC).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: registry-data
+  namespace: registry
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 30Gi

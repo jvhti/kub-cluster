@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: registry
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - registry.yaml
+
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "0" # standalone infra, no deps

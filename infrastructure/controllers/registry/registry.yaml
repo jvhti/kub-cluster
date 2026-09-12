@@ -1,0 +1,91 @@
+# Docker Hub pull-through cache (registry:2).
+#
+# The registry proxies docker.io pulls to registry-1.docker.io, caching the
+# blobs it fetches on the registry-data PVC (pvc.yaml). Once an image is
+# cached here, every node pulls it from the cache instead of hitting (and
+# being rate-limited by) Docker Hub directly.
+#
+# The per-node k3s `registries.yaml` that routes docker.io through this
+# registry is NODE-LOCAL (not in this repo, not ArgoCD-managed) — see
+# README.md for the exact imperative procedure.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry
+  namespace: registry
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # single replica + RWO PVC
+  selector:
+    matchLabels:
+      app: registry
+  template:
+    metadata:
+      labels:
+        app: registry
+    spec:
+      # Image is pulled directly from docker.io on first deploy (before the
+      # mirror is configured on the nodes), so there's no chicken-and-egg;
+      # containerd also falls back to docker.io if this registry is ever down
+      # while a docker.io pull is in flight.
+      containers:
+        - name: registry
+          image: docker.io/library/registry:2
+          ports:
+            - containerPort: 5000
+              name: http
+          env:
+            # Pull-through cache mode: proxy everything to Docker Hub, serving
+            # already-cached blobs locally and fetching misses. FALLTHROUGH
+            # defaults to false (pure proxy) — this registry only ever fronts
+            # docker.io, so that's exactly what we want.
+            - name: REGISTRY_PROXY_REMOTEURL
+              value: https://registry-1.docker.io
+            - name: REGISTRY_PROXY_FALLTHROUGH
+              value: "false"
+            - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
+              value: /var/lib/registry
+            - name: REGISTRY_LOG_LEVEL
+              value: info
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/registry
+          readinessProbe:
+            httpGet: { path: /v2/, port: 5000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /v2/, port: 5000 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 256Mi }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: registry-data
+---
+# type: NodePort gives BOTH a ClusterIP and a NodePort on one Service:
+#   - clusterIP 10.43.255.254:5000  (pinned; stable — nodes reach it via the
+#                                    CNI service LB; preferred for registries.yaml)
+#   - nodePort 30500                (reachable at localhost:30500 on every
+#                                    node — fallback if the ClusterIP isn't
+#                                    reachable from the node for pulls)
+# See README.md for which one ends up in registries.yaml.
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry
+  namespace: registry
+spec:
+  type: NodePort
+  clusterIP: 10.43.255.254
+  selector:
+    app: registry
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000
+      nodePort: 30500
