@@ -1,0 +1,30 @@
+# Expose jvclawd's webhook endpoints publicly at assistant.jvos.dev.
+#
+# Only the /v1/webhooks path prefix is routed — everything else on this
+# hostname gets a 404 from the gateway (no matching rule). No auth in front:
+# the trust boundary is that the webhook paths are unguessable (model-chosen
+# names) and the daemon is otherwise not internet-reachable.
+#
+# external-dns (source: gateway-httproute) picks up the hostname and creates
+# the assistant.jvos.dev A record pointing at the gateway VIP automatically.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: jvclawd-webhooks
+  namespace: jvclaw
+spec:
+  parentRefs:
+    - name: gateway-internal
+      namespace: gateway
+      sectionName: https
+  hostnames:
+    - "assistant.jvos.dev"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/webhooks
+      backendRefs:
+        - name: jvclawd
+          port: 7860
+          weight: 1
