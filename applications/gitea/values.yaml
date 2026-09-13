@@ -39,6 +39,14 @@ postgresql-ha:
     # subchart's own values.yaml comment for exact preset numbers) — well
     # above the "micro" default that was timing out under load.
     resourcesPreset: small
+    # Publish headless-service DNS for not-yet-Ready pods. Without this, the
+    # repmgr peers deadlock after a full-cluster restart: each node's FQDN is
+    # NXDOMAIN until its pod is Ready, and no pod can become Ready because it
+    # can't resolve its upstream peer (headless Endpoints only include Ready
+    # pods). The bitnami subchart comment for this flag names exactly this
+    # case ("network split"). Needed unconditionally for repo recovery, see
+    # kub-cluster docs.
+    headlessWithNotReadyAddresses: true
   pgpool:
     # "small" preset resolves to a 768Mi memory limit in this chart version
     # (confirmed live via the running pod's actual resources, not the
