@@ -1,0 +1,34 @@
+# oauth2-proxy instance dedicated to the jvclaw browser viewer
+# (browser.jvos.dev) — the Authelia OIDC login gate in front of the
+# browser-manager's /viewer/* and /novnc/* routes. Same one-instance-per-
+# hostname reasoning as the other instances (the legacy CLI config is
+# single-upstream/single-redirect-url and can't front two different Hosts).
+# See docs/oauth2-proxy-authelia.md for the full runbook.
+#
+# Why a proxy at all: the manager's viewer is the only public surface of the
+# browser infrastructure, and it must be login-gated. The manager itself also
+# enforces an allowlist (VIEWER_USERS) on the X-Forwarded-User that
+# oauth2-proxy sets — defense in depth, so a misrouted request without a real
+# Authelia session still can't open a session's noVNC.
+#
+# WebSockets: oauth2-proxy natively proxies the noVNC RFB upgrade
+# (browser -> this proxy -> manager /viewer/ws -> session pod :6080/websock).
+# The viewer page carries the oauth2-proxy cookie, so the WS upgrade
+# authenticates like any other request.
+#
+# See infrastructure/controllers/oauth2-proxy-browser/secrets.yaml for how
+# config.existingSecret's keys get their real values.
+config:
+  existingSecret: oauth2-proxy-browser-credentials
+
+extraArgs:
+  provider: oidc
+  oidc-issuer-url: https://auth.jvos.dev
+  redirect-url: https://browser.jvos.dev/oauth2/callback
+  email-domain: "*"
+  cookie-domain: browser.jvos.dev
+  whitelist-domain: .jvos.dev
+  reverse-proxy: "true"
+  set-xauthrequest: "true"
+  cookie-expire: 168h
+  upstream: http://browser-manager.browser.svc.cluster.local:8080

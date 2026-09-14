@@ -1,0 +1,30 @@
+# Non-secret browser-manager config (src/config.ts). API_TOKEN comes from the
+# Secret (secrets.yaml). BROWSER_IMAGE is the PINNED session image — the
+# chromium-headful build workflow's SHA; bump it deliberately (it is the
+# kernel-images commit's noVNC-layered image, amd64-only).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: browser-manager-config
+  namespace: browser
+data:
+  BROWSER_NAMESPACE: "browser"
+  BROWSER_IMAGE: "gitea.jvos.dev/jvhti/chromium-headful:0000000" # set to the built kernel-sha tag
+  BROWSER_MAX_SESSIONS: "2" # start conservative: one 32G node shared with other workloads
+  BROWSER_IDLE_TIMEOUT: "30m"
+  BROWSER_STARTUP_TIMEOUT: "180s"
+  VIEWER_BASE_URL: "https://browser.jvos.dev"
+  # Tight by default (single-operator homelab): only the authelia user may
+  # open the viewer. Comma-separate to add more.
+  VIEWER_USERS: "jvhti@hotmail.com"
+  SESSION_SHM_SIZE: "1Gi"
+  PROFILE_STORAGE_CLASS: "longhorn"
+  PROFILE_PVC_SIZE: "5Gi"
+  SESSION_CPU_REQUEST: "500m"
+  SESSION_MEM_REQUEST: "1Gi"
+  SESSION_CPU_LIMIT: "2"
+  SESSION_MEM_LIMIT: "3Gi"
+  REAPER_INTERVAL: "30s"
+  SESSION_TZ: "America/Sao_Paulo"
+  SESSION_WIDTH: "1920"
+  SESSION_HEIGHT: "1080"

@@ -1,0 +1,23 @@
+# browser-manager Service. Single ClusterIP:
+#   - oauth2-proxy-browser (the public login gate for browser.jvos.dev) uses it
+#     as its upstream (see infrastructure/controllers/oauth2-proxy-browser/).
+#   - jvclaw calls the /v1/* agent API over this Service DNS name from inside
+#     the cluster (bearer-token auth; never routed through the public gateway).
+#   - kube-prometheus-stack scrapes /metrics over it.
+# The per-session Services the manager creates imperatively are separate and
+# are NOT referenced here.
+apiVersion: v1
+kind: Service
+metadata:
+  name: browser-manager
+  namespace: browser
+  labels:
+    app.kubernetes.io/name: browser-manager
+spec:
+  selector:
+    app.kubernetes.io/name: browser-manager
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP

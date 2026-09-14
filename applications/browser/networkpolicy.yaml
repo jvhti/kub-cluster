@@ -1,0 +1,37 @@
+# Defense-in-depth for the imperative browser session pods (created by the
+# manager, NOT ArgoCD-managed — see the headscale precedent in CLAUDE.md).
+#
+# The hard requirement from the design (docs/planning/browser.md, D4): the
+# Chromium CDP port (9222) and the noVNC port (6080) must never be reachable
+# from anything but the browser-manager. The session Services have no public
+# gateway route (the HTTPRoute only publishes /viewer and /novnc through
+# oauth2-proxy), so this policy is the second, in-cluster layer: it makes the
+# session pods accept 9222/6080 ONLY from the browser-manager endpoint and
+# deny all other ingress to those ports.
+#
+# Only `ingress` is specified, so egress from the session pods is left
+# unrestricted — they must be able to browse arbitrary public websites and
+# resolve their DNS. Cilium's model: specifying ingress rules enables
+# default-deny for ingress on the selected endpoints; leaving egress unset
+# keeps egress fully open.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: browser-sessions
+  namespace: browser
+spec:
+  description: Session pods accept CDP (9222) and noVNC (6080) only from the browser-manager.
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: browser-session
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: browser-manager
+      toPorts:
+        - ports:
+            - port: "9222"
+              protocol: TCP
+        - ports:
+            - port: "6080"
+              protocol: TCP

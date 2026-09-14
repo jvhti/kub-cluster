@@ -1,0 +1,44 @@
+# ServiceAccount + tight Role for the browser-manager. The manager creates
+# session Pods/Services and profile PVCs IMPERATIVELY (per-session, on demand)
+# — those objects are NOT ArgoCD-managed; the manager owns their full
+# lifecycle and garbage-collects orphans on startup (the headscale precedent
+# for unmanaged resources, see the CLAUDE.md note). The Role therefore covers
+# exactly the verbs the manager uses and nothing else:
+#   pods:                   get list watch create delete patch
+#   services:               get create delete
+#   persistentvolumeclaims: get create delete
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: browser-manager
+  namespace: browser
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: browser-manager
+  namespace: browser
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: browser-manager
+  namespace: browser
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: browser-manager
+subjects:
+  - kind: ServiceAccount
+    name: browser-manager
+    namespace: browser

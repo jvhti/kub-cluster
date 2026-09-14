@@ -1,0 +1,96 @@
+# browser-manager: session lifecycle + Playwright automation + authenticated
+# noVNC viewer for jvclaw browser sessions (see jvclaw's
+# docs/planning/browser.md). Built by the browser-manager Gitea Actions
+# pipeline and pushed to gitea.jvos.dev/jvhti/browser-manager (SHA tag, never
+# :latest).
+#
+# SINGLE REPLICA BY CONSTRUCTION: the manager keeps an in-memory session map +
+# a stateful reaper and holds the per-session Playwright CDP connections. A
+# second replica would double-create/reap and split the connections, so
+# replicas:1 with a Recreate strategy (a RollingUpdate would run two managers
+# at once during a rollout). This is a control plane for a handful of session
+# pods, not a high-traffic service — a brief downtime on rollout is fine;
+# session PODS keep running through it (they're independent) and are re-adopted
+# on the new manager's startup (orphan adoption, src/sessions.ts).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: browser-manager
+  namespace: browser
+  labels:
+    app.kubernetes.io/name: browser-manager
+    app.kubernetes.io/component: manager
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: browser-manager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: browser-manager
+        app.kubernetes.io/component: manager
+    spec:
+      serviceAccountName: browser-manager
+      # amd64 only (image is amd64-only, like the session pods).
+      #
+      # DNS incident note (2026-09-13, gitea DB outage): both overkill and pi1
+      # briefly had BROKEN pod DNS (glibc getaddrinfo failed; BIND's TCP/53
+      # fallback still worked, which is why nslookup succeeded while
+      # "nc: bad address" looped in init containers). Root cause was a
+      # transient cilium agent/envoy state, NOT the cilium build — deleting
+      # each node's cilium-<node> + cilium-envoy-<node> pods fixed it in both
+      # cases (verified with test pods, 5/5 getent). If this app (or the
+      # session pods) start failing DNS on one node, restart that node's
+      # cilium agent+envoy before suspecting the images or this manifest.
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      # gitea.jvos.dev 401s anonymous pulls (same docker-registry Secret as
+      # jvclaw) — created imperatively, see secrets.yaml.
+      imagePullSecrets:
+        - name: gitea-registry-pull
+      containers:
+        - name: manager
+          image: gitea.jvos.dev/jvhti/browser-manager:0000000 # set to the built SHA tag
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: browser-manager-config
+          env:
+            - name: API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: browser-manager
+                  key: api-token
+          securityContext:
+            runAsNonRoot: true
+            # node:slim "node" user is uid 1000
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 20
