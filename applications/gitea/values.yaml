@@ -47,6 +47,25 @@ postgresql-ha:
     # case ("network split"). Needed unconditionally for repo recovery, see
     # kub-cluster docs.
     headlessWithNotReadyAddresses: true
+    # Give probes a generous budget so a standby that must re-clone the
+    # primary's data (e.g. after a full-cluster restart left it re-initializing
+    # from scratch on a slow node) can finish before kubelet's liveness probe
+    # kills the container. Without this, the 5s probe kills the clone
+    # mid-flight, the data dir restarts empty, and the pod crash-loops forever.
+    livenessProbe:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 20
+      timeoutSeconds: 20
+      successThreshold: 1
+      failureThreshold: 6
+    readinessProbe:
+      enabled: true
+      initialDelaySeconds: 10
+      periodSeconds: 20
+      timeoutSeconds: 20
+      successThreshold: 1
+      failureThreshold: 6
   pgpool:
     # "small" preset resolves to a 768Mi memory limit in this chart version
     # (confirmed live via the running pod's actual resources, not the
