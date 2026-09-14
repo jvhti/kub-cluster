@@ -9,13 +9,19 @@
 # before it ever reaches the manager. jvclaw reaches /v1/* in-cluster over the
 # browser-manager Service DNS name instead.
 #
-# The two PathPrefix rules:
+# The three PathPrefix rules:
 #   /viewer  -> the viewer HTML page (/viewer/), the takeover UI, and the RFB
 #               WebSocket the noVNC client opens (/viewer/ws?session=...).
 #   /novnc   -> the noVNC ES modules served statically by the manager
 #               (/novnc/core/..., /novnc/app/...).
-# Both go to oauth2-proxy-browser, which authenticates (Authelia) and proxies
-# to the manager; the manager then WS-proxies to the session pod's noVNC.
+#   /oauth2  -> the proxy's own login flow endpoints (/oauth2/start,
+#               /oauth2/callback, /oauth2/sign_in, ...). Without this the
+#               sign-in 302 lands on an unrouted path and the gateway 404s
+#               ("page can't be found") before Authelia is ever involved.
+# All three go to oauth2-proxy-browser, which authenticates (Authelia) and
+# proxies /viewer + /novnc to the manager; the manager then WS-proxies to
+# the session pod's noVNC. /v1/*, /health, /metrics stay unrouted -> 404 at
+# the gateway.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -36,6 +42,9 @@ spec:
         - path:
             type: PathPrefix
             value: /novnc
+        - path:
+            type: PathPrefix
+            value: /oauth2
       backendRefs:
         # Cross-namespace backendRef -> needs the ReferenceGrant in
         # infrastructure/controllers/oauth2-proxy-browser/reference-grant.yaml.
