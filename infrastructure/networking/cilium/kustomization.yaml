@@ -3,6 +3,10 @@ kind: Kustomization
 
 resources:
   - ip-pool.yaml
+  # hubble.jvos.dev — the Hubble UI (hubble-ui Service in this same namespace)
+  # behind the Authelia-gated oauth2-proxy-hubble. external-dns auto-creates
+  # the public Cloudflare record from this route's hostname.
+  - http-route-hubble.yaml
 
 helmCharts:
   - name: cilium

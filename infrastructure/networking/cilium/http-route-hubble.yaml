@@ -1,0 +1,33 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: hubble
+  # kube-system — the hubble-ui Service (the upstream, in front of which the
+  # proxy sits) lives here as part of the cilium chart. external-dns sources
+  # its public Cloudflare record for hubble.jvos.dev straight off this
+  # hostname (sources: gateway-httproute), so no manual DNS step.
+  namespace: kube-system
+spec:
+  parentRefs:
+  - name: gateway-internal # Must match the Gateway's metadata.name
+    namespace: gateway
+    sectionName: https # Must match the Gateway's listeners[].name
+  hostnames:
+  - "hubble.jvos.dev"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    # Routes through the Hubble-dedicated oauth2-proxy instance instead of
+    # straight to hubble-ui, so public access is Authelia-gated. Only traffic
+    # via this public hostname is gated — in-cluster consumers reach the UI
+    # over the Service DNS name (hubble-ui.kube-system.svc:80) and bypass the
+    # gateway + proxy entirely. Needs the ReferenceGrant in
+    # infrastructure/controllers/oauth2-proxy-hubble/ (cross-namespace
+    # backendRef).
+    - name: oauth2-proxy-hubble
+      namespace: oauth2-proxy-hubble
+      port: 80
+      weight: 1

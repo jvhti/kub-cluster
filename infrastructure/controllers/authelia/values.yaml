@@ -149,6 +149,12 @@ pod:
         items:
           - key: client-secret-hash
             path: client-secret-hash.txt
+    - name: oidc-client-secret-hubble
+      secret:
+        secretName: authelia-oidc-client-hubble
+        items:
+          - key: client-secret-hash
+            path: client-secret-hash.txt
   extraVolumeMounts:
     - name: users-database
       mountPath: /config/users_database.yml
@@ -208,6 +214,10 @@ pod:
       readOnly: true
     - name: oidc-client-secret-browser
       mountPath: /secrets/client-secret-hash-browser.txt
+      subPath: client-secret-hash.txt
+      readOnly: true
+    - name: oidc-client-secret-hubble
+      mountPath: /secrets/client-secret-hash-hubble.txt
       subPath: client-secret-hash.txt
       readOnly: true
 
@@ -574,6 +584,25 @@ configMap:
           authorization_policy: 'one_factor'
           redirect_uris:
             - 'https://browser.jvos.dev/oauth2/callback'
+          scopes:
+            - 'openid'
+            - 'profile'
+            - 'email'
+            - 'groups'
+          grant_types:
+            - 'authorization_code'
+          response_types:
+            - 'code'
+          # NOT setting token_endpoint_auth_method — see Learning #1 in
+          # docs/oauth2-proxy-authelia.md.
+        - client_id: 'oauth2-proxy-hubble'
+          client_name: 'Hubble (Cilium observability UI)'
+          client_secret:
+            path: '/secrets/client-secret-hash-hubble.txt'
+          public: false
+          authorization_policy: 'one_factor'
+          redirect_uris:
+            - 'https://hubble.jvos.dev/oauth2/callback'
           scopes:
             - 'openid'
             - 'profile'
