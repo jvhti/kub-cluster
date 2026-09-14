@@ -33,6 +33,20 @@ resources:
     cpu: 1000m
     memory: 1Gi
 
+# Gitea's default MAX_OPEN_CONNS is 0 (unlimited). Under a docker push burst
+# (~35 parallel blob HEADs, each needing a DB connection for PAT verification)
+# gitea opened more connections than pgpool's max_client_conn=100 cap; pgpool
+# rejected the excess with "Sorry, too many clients already (53300)", gitea's
+# GetAccessTokenBySHA failed, it fell back to the argon2 password check, and
+# the push died with a nondeterministic 401 "user's password is invalid".
+# Capping the pool at 50 keeps total pgpool clients well under 100: the burst
+# queues inside gitea's pool (auth queries are ~1-5ms) instead of overflowing
+# pgpool.
+deployment:
+  env:
+    - name: GITEA__DATABASE__MAX_OPEN_CONNS
+      value: "50"
+
 postgresql-ha:
   postgresql:
     # "small" preset ~= 500m/512Mi request, 500m/512Mi limit (see the
@@ -75,13 +89,11 @@ postgresql-ha:
       successThreshold: 1
       failureThreshold: 6
   pgpool:
-    # Default num_init_children is 15 backend connections. Gitea's container
-    # registry verifyAuth (packages/api.go) does a DB query per request and
-    # docker push fires ~35 parallel blob HEADs; queued behind 15 children
-    # each query took 3.6-3.9s and gitea converted the timeout into a 401
-    # ("unexpected status from HEAD request ... 401") — image pushes failed
-    # nondeterministically. 32 children clears the queue with margin while
-    # staying within postgres's 768Mi limit (~10-15MB per backend conn).
+    # num_init_children defaults to 15 backend connections. Combined with the
+    # GITEA__DATABASE__MAX_OPEN_CONNS cap above (the actual push-failure root
+    # cause, see comment in this file), 32 children gives extra headroom for
+    # concurrent auth queries during image pushes, while staying within
+    # postgres's 768Mi limit (~10-15MB per backend conn).
     numInitChildren: 32
     # "small" preset resolves to a 768Mi memory limit in this chart version
     # (confirmed live via the running pod's actual resources, not the
