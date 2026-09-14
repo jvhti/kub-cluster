@@ -35,17 +35,31 @@ resources:
 
 # Gitea's default MAX_OPEN_CONNS is 0 (unlimited). Under a docker push burst
 # (~35 parallel blob HEADs, each needing a DB connection for PAT verification)
-# gitea opened more connections than pgpool's max_client_conn=100 cap; pgpool
+# gitea opened more concurrent connections than pgpool could serve; pgpool
 # rejected the excess with "Sorry, too many clients already (53300)", gitea's
 # GetAccessTokenBySHA failed, it fell back to the argon2 password check, and
 # the push died with a nondeterministic 401 "user's password is invalid".
-# Capping the pool at 50 keeps total pgpool clients well under 100: the burst
+#
+# The real pgpool client limit is NOT the nominal max_client_conn=100: pgpool
+# runs in the default STATIC child-process mode, where each of the
+# num_init_children=32 pre-forked children serves exactly ONE client session,
+# and reserved_connections=1 holds one back. Effective client cap = 31.
+# (Verified live: bursts of 60 parallel requests produced "too many clients"
+# rejections while gitea's pool peaked at ~48 conns, and pgpool's local-5432
+# client count never exceeded ~49.)
+#
+# So gitea's pool must stay UNDER 31: 25 leaves headroom for the liveness
+# probe's psql, admin psql, and anything else that connects. The burst now
 # queues inside gitea's pool (auth queries are ~1-5ms) instead of overflowing
 # pgpool.
+# Do NOT "fix" this by raising pgpool numInitChildren instead: in streaming
+# replication clustering mode every child also holds a backend connection to
+# ALL 3 postgres nodes, and the 768Mi postgres memory limit only fits ~32
+# children (32 x 3 backends x ~10-15MB).
 deployment:
   env:
     - name: GITEA__DATABASE__MAX_OPEN_CONNS
-      value: "50"
+      value: "25"
 
 postgresql-ha:
   postgresql:
@@ -89,11 +103,11 @@ postgresql-ha:
       successThreshold: 1
       failureThreshold: 6
   pgpool:
-    # num_init_children defaults to 15 backend connections. Combined with the
-    # GITEA__DATABASE__MAX_OPEN_CONNS cap above (the actual push-failure root
-    # cause, see comment in this file), 32 children gives extra headroom for
-    # concurrent auth queries during image pushes, while staying within
-    # postgres's 768Mi limit (~10-15MB per backend conn).
+    # In static child mode (the default) num_init_children IS the client
+    # session cap (32 - 1 reserved = 31 usable). 32 is the maximum that fits
+    # postgres's 768Mi memory limit (each child holds backends on all 3
+    # nodes, ~10-15MB each). Gitea's MAX_OPEN_CONNS=25 (above) stays under
+    # this cap, which is what actually fixes the docker-push 401s.
     numInitChildren: 32
     # "small" preset resolves to a 768Mi memory limit in this chart version
     # (confirmed live via the running pod's actual resources, not the
