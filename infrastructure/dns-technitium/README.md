@@ -46,7 +46,7 @@ complexity for the same end result a hand-maintained zone gets more simply
 discipline, so this isn't a new maintenance burden, just the same one
 applied to a second DNS server.
 
-## Records (as of 2026-09-03, frigate deployment)
+## Records (as of 2026-09-14, hubble UI)
 
 All TTL 300s. Keep this list in sync with `coredns-custom.yaml`'s `hosts`
 block — same set of hostnames, same targets.
@@ -83,6 +83,7 @@ block — same set of hostnames, same targets.
 | `status.jvos.dev` | `192.168.1.240` |
 | `draw.jvos.dev` | `192.168.1.240` |
 | `frigate.jvos.dev` | `192.168.1.240` |
+| `hubble.jvos.dev` | `192.168.1.240` |
 | `headscale.jvos.dev` | `192.168.1.241` |
 
 ## Adding a new hostname later
