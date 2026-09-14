@@ -75,6 +75,14 @@ postgresql-ha:
       successThreshold: 1
       failureThreshold: 6
   pgpool:
+    # Default num_init_children is 15 backend connections. Gitea's container
+    # registry verifyAuth (packages/api.go) does a DB query per request and
+    # docker push fires ~35 parallel blob HEADs; queued behind 15 children
+    # each query took 3.6-3.9s and gitea converted the timeout into a 401
+    # ("unexpected status from HEAD request ... 401") — image pushes failed
+    # nondeterministically. 32 children clears the queue with margin while
+    # staying within postgres's 768Mi limit (~10-15MB per backend conn).
+    numInitChildren: 32
     # "small" preset resolves to a 768Mi memory limit in this chart version
     # (confirmed live via the running pod's actual resources, not the
     # comment above which was written for a different symptom) — still not
