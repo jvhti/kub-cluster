@@ -1,0 +1,52 @@
+# memos' built-in MCP server (memos >= 0.29 serves /mcp on the main app port
+# 5230 - same port as the web UI, so there is NO separate MCP Deployment/Sidecar
+# here, unlike degoog's standalone ghcr.io/degoog-org/mcp). Exposed on a
+# dedicated LAN-only hostname so the MCP path can reach the app directly
+# WITHOUT the oauth2-proxy-memos login gate (see httproute.yaml) - MCP clients
+# (Claude Desktop, Cursor, opencode) can't do the Authelia browser-redirect
+# login flow against an /mcp endpoint, same reason as degoog's search-mcp.
+#
+# Endpoint URL for clients: https://memos-mcp.jvos.dev/mcp (streamable HTTP,
+# POST-only - a GET probe returns 405).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: memos-mcp
+  namespace: memos
+  annotations:
+    # LAN-only hostname: external-dns (Cloudflare, policy: sync, domainFilter
+    # jvos.dev) watches every HTTPRoute on gateway-internal and would publish a
+    # public A record for memos-mcp.jvos.dev otherwise. That is NOT acceptable
+    # for this route - it has no auth of its own (deliberately bypasses
+    # oauth2-proxy), and memos' /mcp endpoint exposes the full memos API, so a
+    # public record would hand the internet unauthenticated read/write of all
+    # memos data. v0.21.0 has no per-route "ignore" annotation for Gateway
+    # sources, so instead tell external-dns to derive hostnames ONLY from the
+    # external-dns.alpha.kubernetes.io/hostname annotation, which is
+    # deliberately absent here -> zero endpoints -> no public record (verified
+    # live: search-mcp.jvos.dev resolves nothing at 1.1.1.1). LAN clients
+    # resolve it via the Technitium split-horizon zone
+    # (infrastructure/dns-technitium/README.md) and pods via coredns-custom,
+    # both pointing at gateway-internal's VIP like every other entry.
+    external-dns.alpha.kubernetes.io/gateway-hostname-source: "annotation-only"
+spec:
+  parentRefs:
+    - name: gateway-internal
+      namespace: gateway
+      sectionName: https
+  hostnames:
+    - "memos-mcp.jvos.dev"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        # Straight to the main memos Service (same namespace, so no
+        # ReferenceGrant needed) on its app port. Path is preserved, so
+        # /mcp on this hostname lands on memos' own /mcp handler -
+        # deliberately NOT through the oauth2-proxy-memos instance that
+        # fronts the public web UI on memos.jvos.dev (httproute.yaml).
+        - name: memos
+          port: 5230
+          weight: 1
