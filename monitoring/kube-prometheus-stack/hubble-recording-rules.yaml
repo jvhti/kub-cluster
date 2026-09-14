@@ -18,13 +18,13 @@ spec:
       interval: 30s
       rules:
         - record: hubble:flows:rate15m
-          expr: sum by (type, verdict) (rate(hubble_flows_total[15m]))
+          expr: sum by (type, verdict) (rate(hubble_flows_processed_total[15m]))
         - record: hubble:flows:total:rate15m
-          expr: sum(rate(hubble_flows_total[15m]))
+          expr: sum(rate(hubble_flows_processed_total[15m]))
         - record: hubble:drops:rate15m
-          expr: sum by (reason) (rate(hubble_drops_total[15m]))
+          expr: sum by (reason) (rate(hubble_drop_total[15m]))
         - record: hubble:drops:total:rate15m
-          expr: sum(rate(hubble_drops_total[15m]))
+          expr: sum(rate(hubble_drop_total[15m]))
     - name: hubble.alerts
       interval: 30s
       rules:
@@ -45,13 +45,13 @@ spec:
         # or the agent reloaded and never started recording again). Counters
         # persist once set, so absent() means hubble truly isn't reporting.
         - alert: HubbleMetricsAbsent
-          expr: absent(hubble_flows_total) == 1
+          expr: absent(hubble_flows_processed_total) == 1
           for: 15m
           labels:
             severity: warning
           annotations:
             summary: "Hubble metrics have disappeared"
-            description: "hubble_flows_total has been absent for 15 minutes — the Hubble observer/relay metrics pipeline is not reporting. Check the hubble-relay and cilium-agent pods in kube-system."
+            description: "hubble_flows_processed_total has been absent for 15 minutes — the Hubble observer/relay metrics pipeline is not reporting. Check the hubble-relay and cilium-agent pods in kube-system."
         # Directly guards the resource bump made in the cilium values (limits
         # raised to 1Gi because metrics add agent usage). Fires before an
         # OOMKill of the CNI agent would take a node's networking down.
