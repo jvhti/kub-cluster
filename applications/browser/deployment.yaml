@@ -55,7 +55,7 @@ spec:
         - name: manager
           # SHA-pinned (never :latest) — bump this line to a new built tag
           # after each browser-manager Gitea build, then commit.
-          image: gitea.jvos.dev/jvhti/browser-manager:892b398
+          image: gitea.jvos.dev/jvhti/browser-manager:0bc8a7e
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
