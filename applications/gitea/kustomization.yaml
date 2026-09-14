@@ -15,3 +15,18 @@ helmCharts:
     namespace: gitea
     valuesFile: values.yaml
     includeCRDs: true
+
+# Set publishNotReadyAddresses on the postgresql-ha headless Service WITHOUT
+# the subchart's headlessWithNotReadyAddresses flag, which switches the
+# readiness probe to a buggy "enriched" variant that errors on an undefined
+# DELAY_APPLIED_FILE variable (see values.yaml). This patch gives the same
+# DNS-for-not-ready-pods behavior that breaks the repmgr peer deadlock after a
+# full-cluster restart.
+patches:
+  - target:
+      kind: Service
+      name: gitea-postgresql-ha-postgresql-headless
+    patch: |-
+      - op: add
+        path: /spec/publishNotReadyAddresses
+        value: true

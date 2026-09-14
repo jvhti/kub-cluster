@@ -46,7 +46,15 @@ postgresql-ha:
     # pods). The bitnami subchart comment for this flag names exactly this
     # case ("network split"). Needed unconditionally for repo recovery, see
     # kub-cluster docs.
-    headlessWithNotReadyAddresses: true
+    #
+    # NOTE: do NOT use the subchart's headlessWithNotReadyAddresses flag to
+    # achieve this — it switches the readiness probe to the "enriched" variant,
+    # which has a bug (bitnami postgresql-ha 16.3.2, gitea chart 12.7.0):
+    # it does `touch "$DELAY_APPLIED_FILE"` but that variable is never defined
+    # in the section (only DELAY_SEMAPHORE is), and with `set -o nounset` the
+    # probe errors out unconditionally → no postgres pod can ever become Ready.
+    # Same DNS behavior, no broken probe: the publishNotReadyAddresses patch on
+    # the headless Service is applied via kustomization.yaml's patches instead.
     # Give probes a generous budget so a standby that must re-clone the
     # primary's data (e.g. after a full-cluster restart left it re-initializing
     # from scratch on a slow node) can finish before kubelet's liveness probe
