@@ -131,6 +131,26 @@ hubble:
       - icmp
     serviceMonitor:
       enabled: true
+  # Static flow exporter: the agent writes a full record of every flow to a
+  # rotating file — the per-agent flow log. Inspect with:
+  #   kubectl exec -n kube-system ds/cilium -- tail /var/log/hubble/events.log
+  #   kubectl exec -n kube-system ds/cilium -- zcat /var/log/hubble/events.log.1.gz
+  # This is a durable on-disk record for post-hoc debugging/forensics — NOT the
+  # Hubble UI (that reads LIVE flows from the relay; this is the persistent
+  # complement). Written to a hostPath (node disk, see extraVolumes below) NOT
+  # the /var/run/cilium tmpfs, so it (a) survives agent restarts and (b) doesn't
+  # consume the agent's memory budget (that tmpfs is memory-backed; a chatty log
+  # there would push toward the 1Gi limit / the CiliumAgentMemoryHigh alert).
+  # Bounded: 50MB active file x 10 compressed backups ~= ~50MB/node worst case.
+  # Note: the chart applies extraVolumeMounts to every agent-pod container
+  # (incl. init containers) — harmless, they just get an empty hostPath mount.
+  export:
+    static:
+      enabled: true
+      filePath: /var/log/hubble/events.log
+      fileMaxSizeMb: 50
+      fileMaxBackups: 10
+      fileCompress: true
 ingressController:
   enabled: false
   default: true
@@ -148,3 +168,15 @@ authentication:
         server:
           dataStorage:
             storageClass: cilium-spire-sc
+# hostPath backing store for the Hubble static flow exporter (hubble.export
+# above). /var/log/hubble on each node's disk — survives restarts and stays off
+# the agent's memory-backed tmpfs. DirectoryOrCreate so the kubelet creates it
+# on first pod start on each node.
+extraVolumes:
+  - name: hubble-flowlog
+    hostPath:
+      path: /var/log/hubble
+      type: DirectoryOrCreate
+extraVolumeMounts:
+  - name: hubble-flowlog
+    mountPath: /var/log/hubble
