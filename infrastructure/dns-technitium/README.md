@@ -84,6 +84,7 @@ block — same set of hostnames, same targets.
 | `draw.jvos.dev` | `192.168.1.240` |
 | `frigate.jvos.dev` | `192.168.1.240` |
 | `hubble.jvos.dev` | `192.168.1.240` |
+| `browser.jvos.dev` | `192.168.1.240` |
 | `headscale.jvos.dev` | `192.168.1.241` |
 
 ## Adding a new hostname later

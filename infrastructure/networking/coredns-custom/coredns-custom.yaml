@@ -68,6 +68,7 @@ data:
             192.168.1.240 langfuse.jvos.dev
             192.168.1.240 s3.jvos.dev
             192.168.1.240 hubble.jvos.dev
+            192.168.1.240 browser.jvos.dev
             fallthrough
         }
         forward . /etc/resolv.conf
