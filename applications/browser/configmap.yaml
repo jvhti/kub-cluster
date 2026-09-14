@@ -26,5 +26,9 @@ data:
   SESSION_MEM_LIMIT: "3Gi"
   REAPER_INTERVAL: "30s"
   SESSION_TZ: "America/Sao_Paulo"
+  # --no-sandbox: required on the homelab nodes (user namespaces rejected).
+  # --disable-gpu: no GPU in the pods; Chrome 152's Dawn/Vulkan stack
+  # otherwise renders a black X window. Software compositing is fine here.
+  SESSION_CHROMIUM_FLAGS: "--no-sandbox --disable-gpu"
   SESSION_WIDTH: "1920"
   SESSION_HEIGHT: "1080"
