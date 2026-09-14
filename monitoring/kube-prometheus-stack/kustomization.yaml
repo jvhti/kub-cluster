@@ -14,6 +14,15 @@ resources:
   - network-policy.yaml
   - dashboards/k3s-cluster-overview-configmap.yaml
   - dashboards/dashboard-16450-configmap.yaml
+  # Hubble / Cilium observability dashboards (auto-imported from the Cilium
+  # project; grafana_dashboard-labelled so the sidecar provisions them).
+  - dashboards/hubble-dashboard-configmap.yaml
+  - dashboards/hubble-network-overview-namespace-configmap.yaml
+  - dashboards/hubble-dns-namespace-configmap.yaml
+  - dashboards/hubble-l7-http-metrics-by-workload-configmap.yaml
+  - dashboards/cilium-agent-dashboard-configmap.yaml
+  # Hubble recording rules + alerts (drop spikes, denied flows, relay down).
+  - hubble-recording-rules.yaml
   # alertmanager-config.yaml is a standalone Secret (full apiVersion/kind),
   # not a patch onto a pre-existing resource — the Helm chart doesn't
   # render a Secret under this exact name, so it belongs under `resources`

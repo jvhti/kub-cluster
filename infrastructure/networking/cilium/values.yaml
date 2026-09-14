@@ -39,12 +39,26 @@ operator:
 # Roll out cilium agent pods automatically when ConfigMap is updated.
 rollOutCiliumPods: true
 resources:
+  # Bumped from 500m/512Mi: enabling agent + hubble metrics (below) adds
+  # steady per-node CPU/RAM usage, and OOMKilling the CNI agent mid-rollout
+  # is the last thing you want. Watch `kubectl top pod` after the rollout.
   limits:
-    cpu: 500m
-    memory: 512Mi
+    cpu: 1000m
+    memory: 1Gi
   requests:
     cpu: 100m
     memory: 256Mi
+# Agent metrics (cilium_* — endpoints, memory, bpf, drops, conntrack, ...) on
+# :9962. metricsService creates the headless `cilium-agent` Service; the
+# chart's ServiceMonitor scrapes it. trustCRDsExist: the ServiceMonitor CRD
+# already exists (kube-prometheus-stack installs it) — skip the chart's
+# pre-upgrade CRD-existence check.
+prometheus:
+  enabled: true
+  metricsService: true
+  serviceMonitor:
+    enabled: true
+    trustCRDsExist: true
 debug:
   enabled: true
 # Increase rate limit when doing L2 announcements
@@ -93,9 +107,30 @@ hubble:
   relay:
     enabled: true
     rollOutPods: true
+    # Relay-level metrics (hubble_relay_* — connected agents, relayed flow
+    # volume, peer connections) on :9966, scraped via the chart's SM.
+    prometheus:
+      enabled: true
+      serviceMonitor:
+        enabled: true
   ui:
     enabled: true
     rollOutPods: true
+  # THE actual L3-L7 observability value: hubble flow metrics (hubble_flows_*,
+  # hubble_drops_*, hubble_tcp_*, hubble_dns_*, hubble_http_*, hubble_icmp_*)
+  # on :9965. Without this the relay/UI all run but expose nothing to
+  # Prometheus. The chart's SM scrapes the `hubble-metrics` Service. dns is
+  # query-only minus the noise of AAAA lookups.
+  metrics:
+    enabled:
+      - flow
+      - drop
+      - tcp
+      - http
+      - dns:query;ignoreAAAA
+      - icmp
+    serviceMonitor:
+      enabled: true
 ingressController:
   enabled: false
   default: true

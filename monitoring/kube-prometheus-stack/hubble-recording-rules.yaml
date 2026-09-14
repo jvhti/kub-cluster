@@ -1,0 +1,65 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: hubble-recording-rules
+  namespace: kube-prometheus-stack
+  labels:
+    app.kubernetes.io/name: kube-prometheus-stack
+    app.kubernetes.io/instance: prometheus
+    app.kubernetes.io/managed-by: Helm
+    prometheus: prometheus-kube-prometheus-stack-prometheus
+    role: alert-rules
+spec:
+  groups:
+    # Pre-computed Hubble rates — reused by the alerts below and handy for
+    # ad-hoc exploration, so repeated dashboard loads don't each re-scan the
+    # raw counters over a 15m window.
+    - name: hubble.recording
+      interval: 30s
+      rules:
+        - record: hubble:flows:rate15m
+          expr: sum by (type, verdict) (rate(hubble_flows_total[15m]))
+        - record: hubble:flows:total:rate15m
+          expr: sum(rate(hubble_flows_total[15m]))
+        - record: hubble:drops:rate15m
+          expr: sum by (reason) (rate(hubble_drops_total[15m]))
+        - record: hubble:drops:total:rate15m
+          expr: sum(rate(hubble_drops_total[15m]))
+    - name: hubble.alerts
+      interval: 30s
+      rules:
+        # The high-signal one: sustained denial of a meaningful share of
+        # traffic. A NetworkPolicy, endpoint, or route regression usually
+        # shows up here before anything else.
+        - alert: HubbleHighDropRate
+          expr: >
+            (hubble:drops:total:rate15m / hubble:flows:total:rate15m > 0.10)
+            and (hubble:flows:total:rate15m > 0)
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Hubble drop rate > 10% of all flows"
+            description: "More than 10% of observed network flows are being dropped ({{ $value | humanizePercentage }}) for 10 minutes — a NetworkPolicy, endpoint, or route is likely denying traffic. See the Hubble dashboard's drops-by-reason panels for the reason."
+        # The whole hubble metrics pipeline went silent (observer/relay broke,
+        # or the agent reloaded and never started recording again). Counters
+        # persist once set, so absent() means hubble truly isn't reporting.
+        - alert: HubbleMetricsAbsent
+          expr: absent(hubble_flows_total) == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Hubble metrics have disappeared"
+            description: "hubble_flows_total has been absent for 15 minutes — the Hubble observer/relay metrics pipeline is not reporting. Check the hubble-relay and cilium-agent pods in kube-system."
+        # Directly guards the resource bump made in the cilium values (limits
+        # raised to 1Gi because metrics add agent usage). Fires before an
+        # OOMKill of the CNI agent would take a node's networking down.
+        - alert: CiliumAgentMemoryHigh
+          expr: container_memory_working_set_bytes{namespace="kube-system",container="cilium-agent"} > 900 * 1024 * 1024
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Cilium agent memory approaching its 1Gi limit"
+            description: "The cilium-agent on {{ $labels.node }} is using {{ $value | humanize1024 \"B\" }} (> 900Mi of the 1Gi limit) — sustained usage risks an OOMKill of the CNI. Consider raising the agent memory limit in infrastructure/networking/cilium/values.yaml."
