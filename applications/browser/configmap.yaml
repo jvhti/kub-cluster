@@ -9,7 +9,7 @@ metadata:
   namespace: browser
 data:
   BROWSER_NAMESPACE: "browser"
-  BROWSER_IMAGE: "gitea.jvos.dev/jvhti/chromium-headful:1b509b9" # kernel-sha 1b509b900d80ab48891773162b72344b0e48745a
+  BROWSER_IMAGE: "gitea.jvos.dev/jvhti/chromium-headful:1b509b9-l1" # kernel-sha 1b509b900d80ab48891773162b72344b0e48745a, layer 1: CDP socat relay (0.0.0.0:9222->127.0.0.1:9223) + --no-sandbox launcher wrapper + x11vnc -noxdnd fix
   BROWSER_MAX_SESSIONS: "2" # start conservative: one 32G node shared with other workloads
   BROWSER_IDLE_TIMEOUT: "30m"
   BROWSER_STARTUP_TIMEOUT: "180s"
