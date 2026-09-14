@@ -53,7 +53,9 @@ spec:
         - name: gitea-registry-pull
       containers:
         - name: manager
-          image: gitea.jvos.dev/jvhti/browser-manager:0000000 # set to the built SHA tag
+          # SHA-pinned (never :latest) — bump this line to a new built tag
+          # after each browser-manager Gitea build, then commit.
+          image: gitea.jvos.dev/jvhti/browser-manager:4ba3197
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
