@@ -29,6 +29,8 @@ data:
   # --no-sandbox: required on the homelab nodes (user namespaces rejected).
   # --disable-gpu: no GPU in the pods; Chrome 152's Dawn/Vulkan stack
   # otherwise renders a black X window. Software compositing is fine here.
-  SESSION_CHROMIUM_FLAGS: "--no-sandbox --disable-gpu"
+  # --start-maximized: Chrome otherwise opens at a small default window
+  # size instead of filling the (fixed-size) X screen the viewer shows.
+  SESSION_CHROMIUM_FLAGS: "--no-sandbox --disable-gpu --start-maximized"
   SESSION_WIDTH: "1920"
   SESSION_HEIGHT: "1080"
