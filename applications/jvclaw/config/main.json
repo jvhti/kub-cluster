@@ -6,8 +6,21 @@
     "stream": true,
     "affinity": true,
     "tools": {
-      "enabled": ["web_fetch", "web_search", "shell"],
-      "acting": ["shell"],
+      "enabled": [
+        "web_fetch", "web_search", "shell",
+        "browser_session_create", "browser_session_destroy",
+        "browser_takeover", "browser_release",
+        "browser_open", "browser_snapshot", "browser_click", "browser_type",
+        "browser_press", "browser_scroll", "browser_tabs", "browser_close_tab",
+        "browser_go_back", "browser_go_forward", "browser_screenshot"
+      ],
+      "acting": [
+        "shell",
+        "browser_session_create", "browser_session_destroy",
+        "browser_takeover", "browser_release",
+        "browser_open", "browser_click", "browser_type", "browser_press",
+        "browser_scroll", "browser_close_tab", "browser_go_back", "browser_go_forward"
+      ],
       "shellAllowed": [],
       "webSearchBaseUrl": "http://degoog.degoog.svc.cluster.local:4444",
       "webFetchCmd": ""
@@ -22,6 +35,13 @@
       "enabled": true,
       "_comment": "LLM auto-approver ON: the classifier (shell.auto.model, default = the agent's primary) decides unmatched shell commands before paging the human. A benign command runs; a flagged one is denied (deny-and-continue) and, past the backstop, escalates to a human ask."
     }
+  },
+  "browser": {
+    "enabled": true,
+    "managerUrl": "http://browser-manager.browser.svc.cluster.local:8080",
+    "apiKey": "env:BROWSER_MANAGER_TOKEN",
+    "defaultSession": "agent-main",
+    "_comment": "15 browser_* tools over the in-cluster browser-manager (docs/planning/browser.md, docs/planning/HANDOFF.md). defaultSession=agent-main is a persistent Longhorn-backed profile auto-created on first use, so logins/cookies survive across turns. BROWSER_MANAGER_TOKEN comes from jvclawd-secrets (see this app's secrets.yaml)."
   },
   "tasksDb": "data/jvclaw.db"
 }
