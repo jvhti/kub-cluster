@@ -126,6 +126,29 @@ postgresql-ha:
 
 gitea:
   config:
+    server:
+      # The chart sets none of these, so app.ini kept Gitea's own defaults
+      # (DOMAIN/SSH_DOMAIN = git.example.com). Git over HTTPS never cared —
+      # remotes are set explicitly — but every absolute URL Gitea renders was
+      # wrong: the clone URLs in the web UI, and the `url`/`html_url` fields in
+      # API responses, which returned things like
+      # "http://git.example.com/api/v1/user/keys/1" and
+      # "http://gitea-http.gitea.svc:3000/jvhti" (confirmed live). ROOT_URL is
+      # the one that actually matters for what the UI shows — it's the
+      # external, proxied URL, deliberately not the in-cluster
+      # gitea-http:3000 the HTTPS route forwards to.
+      #
+      # NOTE: SSH is NOT reachable from outside the cluster: gitea-ssh is a
+      # headless ClusterIP (22 -> 2222) with no NodePort/LoadBalancer and no
+      # TCPRoute on the gateway, and the DMZ-forwarder LXC only carries
+      # HTTP/HTTPS (plus specific UDP ports). So SSH_DOMAIN below is the
+      # correct *intent* — the git@git… clone URL it produces will only
+      # actually work once SSH is exposed (needs a DMZ-forwarder TCP mapping
+      # to a NodePort/LB Service for gitea-ssh, and SSH_PORT updated to
+      # whatever external port that uses).
+      DOMAIN: gitea.jvos.dev
+      ROOT_URL: https://gitea.jvos.dev/
+      SSH_DOMAIN: gitea.jvos.dev
     service:
       # Closed off after creating the one real (admin) account by hand —
       # single-user homelab instance, no self-registration needed. Existing
