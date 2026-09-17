@@ -150,10 +150,10 @@ kubectl exec mpfix -- nsenter -t 1 -m -p sh -c \
 kubectl delete pod mpfix --wait=false
 ```
 
-## Leftover from this incident
+## Cleanup from this incident
 
-`applications/immich/redis.yaml` currently carries a `nodeAffinity`
-excluding `kub-node-1`, added mid-incident as a workaround before this was
-root-caused. Safe to remove once the multipath fix has had a reboot or
-two to prove durable — it's redundant now that the actual cause is fixed
+`applications/immich/redis.yaml` carried a `nodeAffinity` excluding
+`kub-node-1` from mid-incident until 2026-09-17, added as a workaround
+before this was root-caused. Removed once the multipath fix had proven
+durable across reboots — it was redundant once the actual cause was fixed
 on that node.
