@@ -125,6 +125,18 @@ postgresql-ha:
         memory: 1536Mi
 
 gitea:
+  service:
+    ssh:
+      # NodePort instead of the chart default (headless ClusterIP, 22 ->
+      # 2222): HAProxy on the DMZ-forwarder LXC is SNI-based and SSH has no
+      # TLS ClientHello to route on, so SSH can't share 80/443. It follows
+      # the WireGuard pattern instead — a NodePort the LXC can nftables-DNAT
+      # to (see infrastructure/dmz-forwarder/). Any node's IP works as the
+      # DNAT target since NodePort listens on all of them, and the LXC at
+      # 192.168.1.239 is the one hop that can reach both LAN clients and the
+      # DMZ.
+      type: NodePort
+      nodePort: 30222
   config:
     server:
       # The chart sets none of these, so app.ini kept Gitea's own defaults
@@ -138,17 +150,19 @@ gitea:
       # external, proxied URL, deliberately not the in-cluster
       # gitea-http:3000 the HTTPS route forwards to.
       #
-      # NOTE: SSH is NOT reachable from outside the cluster: gitea-ssh is a
-      # headless ClusterIP (22 -> 2222) with no NodePort/LoadBalancer and no
-      # TCPRoute on the gateway, and the DMZ-forwarder LXC only carries
-      # HTTP/HTTPS (plus specific UDP ports). So SSH_DOMAIN below is the
-      # correct *intent* — the git@git… clone URL it produces will only
-      # actually work once SSH is exposed (needs a DMZ-forwarder TCP mapping
-      # to a NodePort/LB Service for gitea-ssh, and SSH_PORT updated to
-      # whatever external port that uses).
+      # SSH_PORT is what Gitea advertises, so clone URLs render as
+      # ssh://git@gitea.jvos.dev:2222/… (non-22 forces the ssh:// form rather
+      # than scp-style). 2222 rather than 22 because the DMZ-forwarder LXC's
+      # own sshd owns 22 on the box that receives the DNAT. That URL is
+      # correct from the internet; from the LAN it can't be, because
+      # gitea.jvos.dev resolves to the gateway VIP (192.168.1.240), which has
+      # no SSH listener at all. LAN clients therefore need an ssh_config
+      # alias for gitea.jvos.dev pointing at 192.168.1.239 — the LXC DNATs
+      # the same 2222 for LAN-sourced traffic too (see its README).
       DOMAIN: gitea.jvos.dev
       ROOT_URL: https://gitea.jvos.dev/
       SSH_DOMAIN: gitea.jvos.dev
+      SSH_PORT: 2222
     service:
       # Closed off after creating the one real (admin) account by hand —
       # single-user homelab instance, no self-registration needed. Existing
