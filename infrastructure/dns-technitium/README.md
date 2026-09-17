@@ -1,9 +1,13 @@
 # Technitium DNS: jvos.dev split-horizon zone (LAN)
 
 **Not managed by ArgoCD/kubectl — Technitium runs outside the cluster
-entirely** (`192.168.1.252:5380` / `10.0.0.2:5380`). This is a reference doc
-only; the zone itself is the source of truth, maintained by hand via
-Technitium's UI or API.
+entirely.** This is a reference doc only; the zones themselves are the
+source of truth, maintained by hand via Technitium's UI or API.
+
+There are two clustered Technitium nodes (see "Cluster" below): the
+**primary** at `192.168.1.252:5380` / `10.0.0.2:5380`, and a **secondary**
+at `192.168.1.253:5380` / `10.0.0.3:5380`. Either answers the same zones,
+so a LAN device can use either address as its resolver.
 
 ## Why this exists
 
@@ -19,15 +23,71 @@ needs its DHCP-assigned or manually-configured DNS server to actually be
 
 ## What it is
 
-A **Primary** zone for `jvos.dev` in Technitium, authoritative (not a
-conditional forwarder) — this server never forwards `*.jvos.dev` queries
-upstream once the zone exists, same effective behavior as
+A **Primary** zone for `jvos.dev` in Technitium (replicated to the
+secondary node as a `Secondary` zone — see "Cluster" below), authoritative
+(not a conditional forwarder) — this server never forwards `*.jvos.dev`
+queries upstream once the zone exists, same effective behavior as
 `coredns-custom`'s `hosts { ... fallthrough }` block. A records point
 `*.jvos.dev` hostnames straight at the internal Cilium Gateway VIPs
 (`192.168.1.240` for everything routed via `gateway-internal`'s HTTPRoutes,
 `192.168.1.241` for `headscale.jvos.dev` specifically, which uses its own
 Gateway/TLSRoute — see `infrastructure/controllers/headscale/gateway.yaml`
 for why).
+
+## Cluster (primary + secondary)
+
+Added 2026-09-17. Technitium's own clustering (v14+) keeps the second node
+in sync — both are standalone Proxmox LXCs, unrelated to the k3s cluster:
+
+| | Primary | Secondary |
+|---|---|---|
+| LXC | `124 technitiumdns` on `ra` | `141 technitiumdns2` on `osiris` |
+| LAN / internal addrs | `192.168.1.252`, `10.0.0.2` | `192.168.1.253`, `10.0.0.3` |
+| `dnsServerDomain` | `dns.home.litb.com.br` | `technitiumdns2.home.litb.com.br` |
+| Config dir / unit | `/etc/dns`, `technitium.service` | `/etc/dns`, `dns.service` |
+
+- Cluster domain is **`home.litb.com.br`**. The init creates the catalog
+  zone **`cluster-catalog.home.litb.com.br`** — that membership list is what
+  drives replication. HTTPS (self-signed, `:53443`) is required for
+  node-to-node sync and is enabled by the init;
+  `webServiceHttpToTlsRedirect` is intentionally left `false` so the
+  plain-HTTP `:5380` API the commands below use keeps working.
+- **Zones only replicate if they're members of the catalog zone** —
+  `jvos.dev` and `home.litb.com.br` were registered with
+  `POST /api/zones/options/set?zone=<zone>&catalog=cluster-catalog.home.litb.com.br`
+  and now exist as `Secondary` zones on `141` (SOA serial tracks the
+  primary's). Anything not in the catalog stays primary-only. Corollary:
+  **edit zone records on the primary only** — the secondary's copies are
+  read-only. DHCP is not synced (there are no DHCP scopes here anyway), and
+  node-specific options (`dnsServerLocalEndPoints`, TLS certs) are per-node
+  by design.
+- Health/membership: `GET /api/admin/cluster/state?token=<TOKEN>`. Upstream
+  docs: [blog.technitium.com — understanding
+  clustering](https://blog.technitium.com/2025/11/understanding-clustering-and-how-to.html)
+  and `APIDOCS.md` in the Technitium repo.
+- Zone updates reach the secondary by DNS NOTIFY (primary → secondaries),
+  falling back to the member zones' SOA refresh (900s). Right after a fresh
+  join the primary may log `failed to notify name server ... (RCODE=Refused)`
+  for zones the secondary hasn't provisioned yet — transient, it clears
+  itself. If propagation ever looks stuck, check `notifyFailed` /
+  `notifyFailedFor` in the primary's `/api/zones/list` and compare SOA
+  serials on both nodes.
+- **Adding another node**: `POST /api/admin/cluster/initJoin` on the *new*
+  node (`Content-Type: application/x-www-form-urlencoded`), with
+  `secondaryNodeIpAddresses=<its addrs>`, `ignoreCertificateErrors=true`,
+  the `cluster-sync` credentials below, and `primaryNodeUrl` — which
+  **must be the primary's domain name** (`https%3A%2F%2Fdns.home.litb.com.br%3A53443%2F`),
+  not an IP (the API rejects an IP outright). Pass
+  `primaryNodeIpAddress=192.168.1.252` explicitly too: a fresh node has no
+  internal zone yet and can otherwise resolve the primary's name to its
+  *public* IP. Note the join **replaces the joining node's Administration
+  section** with the primary's (users/settings), which also disables the
+  default `admin`/`admin` login on a fresh install.
+- To upgrade, avoid the official installer on a node whose unit isn't
+  `dns.service` (it would create a second unit): back up `/etc/dns`, then
+  extract
+  [DnsServerPortable.tar.gz](https://download.technitium.com/dns/DnsServerPortable.tar.gz)
+  over `/opt/technitium/dns` and restart the existing unit.
 
 ## Why not external-dns + a Technitium webhook
 
@@ -93,7 +153,8 @@ Whenever a new `HTTPRoute`/`TLSRoute` is added under `infrastructure/` or
 `applications/`, add the matching record here too (same target VIP as the
 Gateway it attaches to) and to `coredns-custom.yaml`'s `hosts` block. Via
 the Technitium API (needs a user with Zones Modify permission, or
-Administrators group membership):
+Administrators group membership), **on the primary** — catalog replication
+propagates it to the secondary by itself:
 
 ```
 curl "http://192.168.1.252:5380/api/zones/records/add?token=<TOKEN>&domain=<new>.jvos.dev&zone=jvos.dev&type=A&ipAddress=192.168.1.240&ttl=300"
@@ -114,3 +175,22 @@ Despite the name, this user isn't actually driving `external-dns` — the
 webhook approach was rejected (see above) — the name was chosen before that
 decision and left as-is since renaming a Technitium user isn't
 straightforward via the UI.
+
+## The `cluster-sync` user
+
+A second dedicated user (`cluster-sync`, also in the **Administrators**
+group), created 2026-09-17, used only for cluster operations: `initJoin`
+requires a primary-side administrator's username/password and there's no
+token-based alternative. Created with `/api/admin/users/create`, then
+`/api/admin/users/set?user=cluster-sync&memberOfGroups=Administrators`.
+
+Because the Administration section is part of cluster sync, the user exists
+on both nodes. Its password is kept on the k8s cluster as the
+`technitium-cluster-user` Secret in the `default` namespace — the reference
+shape and read-back/rotation commands are in this directory's
+`technitium-cluster-user-secret.yaml`. Read it with:
+
+```
+kubectl get secret technitium-cluster-user -n default \
+  -o jsonpath='{.data.password}' | base64 -d
+```
