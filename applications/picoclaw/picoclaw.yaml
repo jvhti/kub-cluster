@@ -44,7 +44,7 @@ metadata:
   name: picoclaw
   namespace: picoclaw
 spec:
-  replicas: 1
+  replicas: 0
   strategy:
     type: Recreate # RWO Longhorn data PVC — a RollingUpdate would try to attach it to two pods at once
   selector:
