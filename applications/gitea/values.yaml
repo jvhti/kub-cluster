@@ -3,6 +3,17 @@
 # Bundled postgresql-ha / valkey-cluster subcharts stay on the longhorn
 # (NVMe) default StorageClass - databases need low-latency random I/O that
 # NFS can't provide.
+
+# Pin the Gitea app version above the chart's default. Chart 12.7.0's
+# appVersion is 1.27.0, but 1.27.1 -> 1.27.3 are all SECURITY patch releases
+# (package token-scope enforcement, attachment same-repo path checks, actions
+# artifact signature verification, ...) and gitea.com has not re-tagged the
+# chart for them. image.tag overrides appVersion (see the chart's
+# _helpers.tpl `gitea.image`), so bump this on each new security patch rather
+# than waiting for a chart release.
+image:
+  tag: "1.27.3"
+
 persistence:
   storageClass: nfs-csi
   accessModes:
