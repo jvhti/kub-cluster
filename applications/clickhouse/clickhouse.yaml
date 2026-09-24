@@ -10,7 +10,7 @@ metadata:
   name: clickhouse
   namespace: clickhouse
 spec:
-  replicas: 1
+  replicas: 0 # stopped 2026-09-24 — CPU hog during host CPU-starvation incident (kub-node-1 ~148%)
   strategy:
     type: Recreate
   selector:

@@ -100,10 +100,10 @@ langfuse:
         issuer: https://auth.jvos.dev
         name: Authelia
 web:
-  deploy: true
+  deploy: false # stopped 2026-09-24 — CPU hog during host CPU-starvation incident
 
 worker:
-  deploy: true
+  deploy: false # stopped 2026-09-24 — CPU hog during host CPU-starvation incident
 
 ingress:
   enabled: false
