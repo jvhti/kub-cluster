@@ -33,6 +33,20 @@ spec:
       labels:
         app: gluetun
     spec:
+      # qbittorrent + prowlarr share this pod's netns via gluetun. Both are
+      # sustained CPU/IO consumers, so prefer the worker node (kub-node-1,
+      # on osiris — 24 vCPU) over the control plane, whose host (ra)
+      # saturates during k3s reconciliation.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - kub-node-1
       containers:
         - name: gluetun
           image: qmcgaw/gluetun:v3.41

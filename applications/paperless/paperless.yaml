@@ -32,6 +32,21 @@ spec:
       # same-named Service might introduce, on top of the explicit
       # PAPERLESS_PORT override below.
       enableServiceLinks: false
+      # OCR/PDF parsing is a sustained CPU consumer. Prefer the worker node
+      # (kub-node-1, on osiris — 24 vCPU) over the control plane, whose host
+      # (ra) saturates during k3s reconciliation. Note the bundled redis
+      # (redis.yaml) separately prefers pi1 — that split is deliberate, the
+      # app does the heavy work and the cache does not.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - kub-node-1
       containers:
         - name: paperless
           image: ghcr.io/paperless-ngx/paperless-ngx:2.15

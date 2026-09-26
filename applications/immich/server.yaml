@@ -70,12 +70,15 @@ spec:
               port: 2283
             initialDelaySeconds: 30
             periodSeconds: 20
-          # kub-node-1 (a KVM VM with an emulated HDD) is chronically
-          # CPU/disk-saturated, so booting the Node.js server (loading
-          # node_modules = thousands of small reads) can exceed the old
-          # ~90s liveness window and crashloop forever. A startupProbe lets
-          # it take up to 5min to boot; once it answers, liveness/readiness
-          # gate it as normal.
+          # Booting the Node.js server (loading node_modules = thousands of
+          # small reads) can exceed the old ~90s liveness window and
+          # crashloop forever on a saturated node. A startupProbe lets it
+          # take up to 5min to boot; once it answers, liveness/readiness
+          # gate it as normal. Originally added because kub-node-1 was
+          # CPU/disk-saturated as a KVM VM on ra; it has since moved to
+          # osiris with far more CPU, but keep the probe as headroom — the
+          # failure mode is a permanent crashloop, which is far worse than
+          # a slow start.
           startupProbe:
             httpGet:
               path: /api/server/ping
