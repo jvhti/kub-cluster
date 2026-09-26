@@ -100,15 +100,21 @@ langfuse:
         issuer: https://auth.jvos.dev
         name: Authelia
 web:
-  deploy: false # stopped 2026-09-24 — CPU hog during host CPU-starvation incident
+  # Restored 2026-09-26. Was stopped 2026-09-24 as a CPU-starvation mitigation,
+  # but that incident's actual root cause was `kub-ctrl-1` being cordoned —
+  # Longhorn marks cordoned nodes Schedulable=False, so no replica could launch
+  # and every volume failed to attach. Fixing that (uncordon) plus moving this
+  # workload off the control plane makes the stop unnecessary.
+  deploy: true
   # Langfuse web is CPU-heavy. Prefer the worker node (kub-node-1, on osiris —
-  # 24 vCPU) over the control plane, whose host (ra) saturates during k3s
-  # reconciliation. Soft preference so a rollout can still land elsewhere.
+  # 24 vCPU / 24GB) over the control plane, whose host (ra) saturates during
+  # k3s reconciliation. Soft preference so a rollout can still land elsewhere.
   nodeSelector:
     kubernetes.io/hostname: kub-node-1
 
 worker:
-  deploy: false # stopped 2026-09-24 — CPU hog during host CPU-starvation incident
+  # Restored 2026-09-26 — see the note under `web:` above.
+  deploy: true
   nodeSelector:
     kubernetes.io/hostname: kub-node-1
 

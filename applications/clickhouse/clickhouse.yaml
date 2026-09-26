@@ -10,7 +10,12 @@ metadata:
   name: clickhouse
   namespace: clickhouse
 spec:
-  replicas: 0 # stopped 2026-09-24 — CPU hog during host CPU-starvation incident (kub-node-1 ~148%)
+  # Restored 2026-09-26. Was replicas:0 from 2026-09-24 as a CPU-starvation
+  # mitigation. That stop was never the real fix — the root cause was
+  # `kub-ctrl-1` being cordoned, which broke Longhorn replica scheduling and
+  # cascaded into every volume failing to attach. With that fixed and the
+  # affinity below pinning ClickHouse to the worker node, 1 replica is safe.
+  replicas: 1
   strategy:
     type: Recreate
   selector:
