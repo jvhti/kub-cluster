@@ -101,9 +101,16 @@ langfuse:
         name: Authelia
 web:
   deploy: false # stopped 2026-09-24 — CPU hog during host CPU-starvation incident
+  # Langfuse web is CPU-heavy. Prefer the worker node (kub-node-1, on osiris —
+  # 24 vCPU) over the control plane, whose host (ra) saturates during k3s
+  # reconciliation. Soft preference so a rollout can still land elsewhere.
+  nodeSelector:
+    kubernetes.io/hostname: kub-node-1
 
 worker:
   deploy: false # stopped 2026-09-24 — CPU hog during host CPU-starvation incident
+  nodeSelector:
+    kubernetes.io/hostname: kub-node-1
 
 ingress:
   enabled: false

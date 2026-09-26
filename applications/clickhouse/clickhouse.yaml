@@ -21,6 +21,19 @@ spec:
       labels:
         app: clickhouse
     spec:
+      # Columnar store is a CPU/IO hog (ran ~148-219% during the 2026-09-24
+      # incident). Prefer the worker node (kub-node-1, on osiris) over the
+      # control plane, whose host (ra) saturates during k3s reconciliation.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - kub-node-1
       containers:
         - name: clickhouse
           image: clickhouse/clickhouse-server:26.4

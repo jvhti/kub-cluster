@@ -20,6 +20,21 @@ spec:
       labels:
         app: jellyfin
     spec:
+      # Software transcoding is CPU-heavy (see the "no GPU passthrough yet"
+      # note below). Prefer the worker node (kub-node-1, on osiris — 24 vCPU)
+      # over the control plane, whose host (ra) saturates during k3s startup
+      # reconciliation. Soft preference, not required, so a rollout can still
+      # land elsewhere if osiris is unavailable.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - kub-node-1
       containers:
         - name: jellyfin
           image: jellyfin/jellyfin:10.11.11
