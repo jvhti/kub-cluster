@@ -99,13 +99,26 @@ postgresql-ha:
     # from scratch on a slow node) can finish before kubelet's liveness probe
     # kills the container. Without this, the 5s probe kills the clone
     # mid-flight, the data dir restarts empty, and the pod crash-loops forever.
+    #
+    # Liveness budget = initialDelaySeconds + failureThreshold * periodSeconds.
+    # At failureThreshold 6 / periodSeconds 20 that is only ~150s, which the
+    # repmgr standby clone of a 266M data dir blows straight through whenever
+    # the Longhorn volume is still recovering — observed live as
+    # "Liveness probe failed" + "Readiness probe failed: standby clone in
+    # progress", container SIGTERMed mid-clone, clone restarting from empty
+    # every ~2.5min forever. Readiness correctly reports the clone-in-progress
+    # state and is NOT fatal, so only the liveness budget needs raising.
+    # 90 * 20 + 30 ~= 30min is comfortably longer than a slow clone while
+    # still bounding a genuine post-startup hang. The chart exposes no
+    # startupProbe for postgresql (confirmed live on the StatefulSet), so the
+    # liveness budget is the only lever to gate the clone window.
     livenessProbe:
       enabled: true
       initialDelaySeconds: 30
       periodSeconds: 20
       timeoutSeconds: 20
       successThreshold: 1
-      failureThreshold: 6
+      failureThreshold: 90
     readinessProbe:
       enabled: true
       initialDelaySeconds: 10
