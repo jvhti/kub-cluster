@@ -218,7 +218,6 @@ set only; the zone also carries the cluster's own managed records
 | `search-mcp.jvos.dev` | `192.168.1.240` |
 | `memos.jvos.dev` | `192.168.1.240` |
 | `memos-mcp.jvos.dev` | `192.168.1.240` |
-| `picoclaw.jvos.dev` | `192.168.1.240` |
 | `start.jvos.dev` | `192.168.1.240` |
 | `chat.jvos.dev` | `192.168.1.240` |
 | `status.jvos.dev` | `192.168.1.240` |
