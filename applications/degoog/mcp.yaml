@@ -24,6 +24,19 @@ spec:
       labels:
         app: degoog-mcp
     spec:
+      # Prefer the worker node (kub-node-1) over the control plane, whose
+      # host (ra) saturates/thermal-throttles under combined k3s + workload
+      # CPU pressure.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - kub-node-1
       # Same collision class as degoog.yaml: the Service below is named
       # "degoog-mcp", so Kubernetes auto-injects DEGOOG_MCP_PORT=tcp://
       # <clusterIP>:4443 (legacy service-links), which degoog-mcp reads as

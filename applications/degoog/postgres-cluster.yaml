@@ -11,6 +11,19 @@ metadata:
   namespace: degoog
 spec:
   instances: 1
+  # Sustained CPU/IO consumer. Prefer the worker node (kub-node-1) over
+  # the control plane, whose host (ra) saturates/thermal-throttles under
+  # combined k3s + workload CPU pressure.
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - kub-node-1
   imageName: ghcr.io/cloudnative-pg/postgresql:17-bookworm
   storage:
     size: 10Gi

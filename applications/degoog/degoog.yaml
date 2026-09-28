@@ -15,6 +15,19 @@ spec:
       labels:
         app: degoog
     spec:
+      # Prefer the worker node (kub-node-1) over the control plane, whose
+      # host (ra) saturates/thermal-throttles under combined k3s + workload
+      # CPU pressure.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - kub-node-1
       # Same collision class documented in applications/paperless/paperless.yaml:
       # Kubernetes auto-injects a <SVCNAME>_PORT env var for every Service
       # visible to the pod (legacy Docker-links convention), and since the

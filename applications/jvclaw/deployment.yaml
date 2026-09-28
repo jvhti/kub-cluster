@@ -35,6 +35,19 @@ spec:
       labels:
         app: jvclawd
     spec:
+      # Prefer the worker node (kub-node-1) over the control plane, whose
+      # host (ra) saturates/thermal-throttles under combined k3s + workload
+      # CPU pressure.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - kub-node-1
       # gitea.jvos.dev 401s anonymous pulls — k3s needs this docker-registry
       # Secret (same admin PAT as gitea-admin-pat). Created imperatively — see
       # secrets.yaml.

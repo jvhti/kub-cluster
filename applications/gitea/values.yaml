@@ -74,6 +74,20 @@ deployment:
 
 postgresql-ha:
   postgresql:
+    # Sustained CPU/IO consumer (repmgr + streaming replication across 3
+    # nodes). Prefer the worker node (kub-node-1) over the control plane,
+    # whose host (ra) saturates/thermal-throttles under combined k3s +
+    # workload CPU pressure.
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: kubernetes.io/hostname
+                  operator: In
+                  values:
+                    - kub-node-1
     # "small" preset ~= 500m/512Mi request, 500m/512Mi limit (see the
     # subchart's own values.yaml comment for exact preset numbers) — well
     # above the "micro" default that was timing out under load.
@@ -127,6 +141,20 @@ postgresql-ha:
       successThreshold: 1
       failureThreshold: 6
   pgpool:
+    # Sustained CPU consumer under load (see the docker-push 401 saga
+    # above). Prefer the worker node (kub-node-1) over the control plane,
+    # whose host (ra) saturates/thermal-throttles under combined k3s +
+    # workload CPU pressure.
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: kubernetes.io/hostname
+                  operator: In
+                  values:
+                    - kub-node-1
     # In static child mode (the default) num_init_children IS the client
     # session cap (32 - 1 reserved = 31 usable). 32 is the maximum that fits
     # postgres's 768Mi memory limit (each child holds backends on all 3
@@ -149,6 +177,19 @@ postgresql-ha:
         memory: 1536Mi
 
 gitea:
+  # Prefer the worker node (kub-node-1) over the control plane, whose host
+  # (ra) saturates/thermal-throttles under combined k3s + workload CPU
+  # pressure.
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - kub-node-1
   service:
     ssh:
       # NodePort instead of the chart default (headless ClusterIP, 22 ->

@@ -18,6 +18,19 @@ spec:
       labels:
         app: memos
     spec:
+      # Prefer the worker node (kub-node-1) over the control plane, whose
+      # host (ra) saturates/thermal-throttles under combined k3s + workload
+      # CPU pressure.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - kub-node-1
       containers:
         - name: memos
           image: neosmemo/memos:stable

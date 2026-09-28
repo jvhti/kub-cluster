@@ -23,6 +23,19 @@ spec:
       labels:
         app: sonarr
     spec:
+      # Prefer the worker node (kub-node-1) over the control plane, whose
+      # host (ra) saturates/thermal-throttles under combined k3s + workload
+      # CPU pressure.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - kub-node-1
       containers:
         - name: sonarr
           image: ghcr.io/home-operations/sonarr:4.0.19.3001
@@ -78,6 +91,19 @@ spec:
       labels:
         app: radarr
     spec:
+      # Prefer the worker node (kub-node-1) over the control plane, whose
+      # host (ra) saturates/thermal-throttles under combined k3s + workload
+      # CPU pressure.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - kub-node-1
       containers:
         - name: radarr
           image: ghcr.io/home-operations/radarr:6.4.1.10545
@@ -133,6 +159,19 @@ spec:
       labels:
         app: bazarr
     spec:
+      # Prefer the worker node (kub-node-1) over the control plane, whose
+      # host (ra) saturates/thermal-throttles under combined k3s + workload
+      # CPU pressure.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - kub-node-1
       containers:
         - name: bazarr
           image: ghcr.io/home-operations/bazarr:1.6.0

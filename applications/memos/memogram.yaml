@@ -29,6 +29,19 @@ spec:
       labels:
         app: memogram
     spec:
+      # Prefer the worker node (kub-node-1) over the control plane, whose
+      # host (ra) saturates/thermal-throttles under combined k3s + workload
+      # CPU pressure.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - kub-node-1
       # gitea.jvos.dev/jvhti/memogram is a private registry (the
       # memogram-build repo it's pushed from is private) — k3s can't pull
       # it anonymously. See CLAUDE.md's secrets table for how this Secret

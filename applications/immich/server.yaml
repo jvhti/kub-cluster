@@ -15,6 +15,20 @@ spec:
       labels:
         app: immich-server
     spec:
+      # ML-backed photo processing is a sustained CPU/IO consumer. Prefer
+      # the worker node (kub-node-1) over the control plane, whose host
+      # (ra) saturates/thermal-throttles under combined k3s + workload CPU
+      # pressure.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - kub-node-1
       # Matches uid/gid 568 (TrueNAS's "apps" user), which already owns the
       # existing upload data on the NFS share — avoids a chown of the whole
       # library on first mount.
