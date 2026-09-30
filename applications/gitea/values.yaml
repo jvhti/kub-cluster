@@ -141,6 +141,27 @@ gitea:
     existingSecret: gitea-admin-credentials
     email: jvhti@hotmail.com
     passwordMode: initialOnlyRequireReset
+  # SSO via Authelia (native OIDC, no oauth2-proxy), same pattern as Homarr /
+  # Open WebUI / Gatus. The init container creates or updates this as a Gitea
+  # auth source; each key becomes a `gitea admin auth add-oauth --<kebab>`
+  # flag. `name` is part of the callback URL registered in Authelia
+  # (/user/oauth2/Authelia/callback), so keep the two in sync. The client
+  # credentials come from the imperative `gitea-oauth-authelia` Secret (keys:
+  # key = client id, secret = plaintext client secret), paired with the
+  # hashed `authelia-oidc-client-gitea` in ns authelia.
+  #
+  # Account linking stays on Gitea's default (ACCOUNT_LINKING=login, no auto
+  # registration): Authelia's user is `admin`, not `jvhti`, so the first SSO
+  # login asks for the Gitea password once and links the two. Registration
+  # stays disabled, so SSO can't create new Gitea accounts. Local password
+  # login still works as break-glass if Authelia is down; git over HTTPS and
+  # the registry use access tokens, which SSO doesn't affect.
+  oauth:
+    - name: Authelia
+      provider: openidConnect
+      existingSecret: gitea-oauth-authelia
+      autoDiscoverUrl: https://auth.jvos.dev/.well-known/openid-configuration
+      scopes: email,profile,groups
   service:
     ssh:
       # NodePort instead of the chart default (headless ClusterIP, 22 ->

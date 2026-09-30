@@ -149,6 +149,12 @@ pod:
         items:
           - key: client-secret-hash
             path: client-secret-hash.txt
+    - name: oidc-client-secret-gitea
+      secret:
+        secretName: authelia-oidc-client-gitea
+        items:
+          - key: client-secret-hash
+            path: client-secret-hash.txt
   extraVolumeMounts:
     - name: users-database
       mountPath: /config/users_database.yml
@@ -208,6 +214,10 @@ pod:
       readOnly: true
     - name: oidc-client-secret-hubble
       mountPath: /secrets/client-secret-hash-hubble.txt
+      subPath: client-secret-hash.txt
+      readOnly: true
+    - name: oidc-client-secret-gitea
+      mountPath: /secrets/client-secret-hash-gitea.txt
       subPath: client-secret-hash.txt
       readOnly: true
 
@@ -574,6 +584,29 @@ configMap:
           authorization_policy: 'one_factor'
           redirect_uris:
             - 'https://hubble.jvos.dev/oauth2/callback'
+          scopes:
+            - 'openid'
+            - 'profile'
+            - 'email'
+            - 'groups'
+          grant_types:
+            - 'authorization_code'
+          response_types:
+            - 'code'
+          # NOT setting token_endpoint_auth_method — see Learning #1 in
+          # docs/oauth2-proxy-authelia.md.
+        - client_id: 'gitea'
+          client_name: 'Gitea'
+          client_secret:
+            path: '/secrets/client-secret-hash-gitea.txt'
+          public: false
+          authorization_policy: 'one_factor'
+          redirect_uris:
+            # Not an oauth2-proxy instance: Gitea has native OIDC, registered
+            # as an auth source named "Authelia" by the chart's init container
+            # (gitea.oauth in applications/gitea/values.yaml). The path embeds
+            # that source name, so renaming the source breaks this URI.
+            - 'https://gitea.jvos.dev/user/oauth2/Authelia/callback'
           scopes:
             - 'openid'
             - 'profile'
