@@ -46,38 +46,39 @@ resources:
 
 # Gitea's default MAX_OPEN_CONNS is 0 (unlimited). Under a docker push burst
 # (~35 parallel blob HEADs, each needing a DB connection for PAT verification)
-# gitea opened more concurrent connections than pgpool could serve; pgpool
-# rejected the excess with "Sorry, too many clients already (53300)", gitea's
-# GetAccessTokenBySHA failed, it fell back to the argon2 password check, and
-# the push died with a nondeterministic 401 "user's password is invalid".
-#
-# The real pgpool client limit is NOT the nominal max_client_conn=100: pgpool
-# runs in the default STATIC child-process mode, where each of the
-# num_init_children=32 pre-forked children serves exactly ONE client session,
-# and reserved_connections=1 holds one back. Effective client cap = 31.
-# (Verified live: bursts of 60 parallel requests produced "too many clients"
-# rejections while gitea's pool peaked at ~48 conns, and pgpool's local-5432
-# client count never exceeded ~49.)
-#
-# So gitea's pool must stay UNDER 31: 25 leaves headroom for the liveness
-# probe's psql, admin psql, and anything else that connects. The burst now
-# queues inside gitea's pool (auth queries are ~1-5ms) instead of overflowing
-# pgpool.
-# Do NOT "fix" this by raising pgpool numInitChildren instead: in streaming
-# replication clustering mode every child also holds a backend connection to
-# ALL 3 postgres nodes, and the 768Mi postgres memory limit only fits ~32
-# children (32 x 3 backends x ~10-15MB).
+# gitea opened more concurrent connections than the DB layer could serve
+# (then pgpool's 31-client cap: "Sorry, too many clients already (53300)"),
+# GetAccessTokenBySHA failed, gitea fell back to the argon2 password check,
+# and the push died with a nondeterministic 401 "user's password is
+# invalid". pgpool is gone now (single postgres, max_connections=100), but
+# 25 still keeps a burst queueing inside gitea's pool (auth queries are
+# ~1-5ms) with headroom for probes and admin psql.
 deployment:
   env:
     - name: GITEA__DATABASE__MAX_OPEN_CONNS
       value: "25"
 
+# Single postgres + single valkey instead of the chart's default HA stack
+# (postgresql-ha: 3x repmgr postgres + pgpool; valkey-cluster: 3 nodes).
+# Switched 2026-09-30: for a single-user homelab Gitea the HA stack was 7
+# pods of overhead and the main source of outages, not protection. The
+# repmgr failover logic split-brained (two primaries) during host swap
+# stalls, standbys crash-looped for days re-cloning, and pgpool needed
+# constant tuning (OOM kills, the client cap above). The HA subcharts' PVCs
+# (data-gitea-postgresql-ha-postgresql-*, valkey-data-gitea-valkey-cluster-*)
+# are left behind by the switch and can be deleted once this is stable.
 postgresql-ha:
-  postgresql:
-    # Sustained CPU/IO consumer (repmgr + streaming replication across 3
-    # nodes). Prefer the worker node (kub-node-1) over the control plane,
-    # whose host (ra) saturates/thermal-throttles under combined k3s +
-    # workload CPU pressure.
+  enabled: false
+
+valkey-cluster:
+  enabled: false
+
+postgresql:
+  enabled: true
+  primary:
+    # Prefer the worker node (kub-node-1) over the control plane, whose host
+    # (ra) saturates/thermal-throttles under combined k3s + workload CPU
+    # pressure.
     affinity:
       nodeAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:
@@ -88,93 +89,30 @@ postgresql-ha:
                   operator: In
                   values:
                     - kub-node-1
-    # "small" preset ~= 500m/512Mi request, 500m/512Mi limit (see the
-    # subchart's own values.yaml comment for exact preset numbers) — well
-    # above the "micro" default that was timing out under load.
-    resourcesPreset: small
-    # Publish headless-service DNS for not-yet-Ready pods. Without this, the
-    # repmgr peers deadlock after a full-cluster restart: each node's FQDN is
-    # NXDOMAIN until its pod is Ready, and no pod can become Ready because it
-    # can't resolve its upstream peer (headless Endpoints only include Ready
-    # pods). The bitnami subchart comment for this flag names exactly this
-    # case ("network split"). Needed unconditionally for repo recovery, see
-    # kub-cluster docs.
-    #
-    # NOTE: do NOT use the subchart's headlessWithNotReadyAddresses flag to
-    # achieve this — it switches the readiness probe to the "enriched" variant,
-    # which has a bug (bitnami postgresql-ha 16.3.2, gitea chart 12.7.0):
-    # it does `touch "$DELAY_APPLIED_FILE"` but that variable is never defined
-    # in the section (only DELAY_SEMAPHORE is), and with `set -o nounset` the
-    # probe errors out unconditionally → no postgres pod can ever become Ready.
-    # Same DNS behavior, no broken probe: the publishNotReadyAddresses patch on
-    # the headless Service is applied via kustomization.yaml's patches instead.
-    # Give probes a generous budget so a standby that must re-clone the
-    # primary's data (e.g. after a full-cluster restart left it re-initializing
-    # from scratch on a slow node) can finish before kubelet's liveness probe
-    # kills the container. Without this, the 5s probe kills the clone
-    # mid-flight, the data dir restarts empty, and the pod crash-loops forever.
-    #
-    # Liveness budget = initialDelaySeconds + failureThreshold * periodSeconds.
-    # At failureThreshold 6 / periodSeconds 20 that is only ~150s, which the
-    # repmgr standby clone of a 266M data dir blows straight through whenever
-    # the Longhorn volume is still recovering — observed live as
-    # "Liveness probe failed" + "Readiness probe failed: standby clone in
-    # progress", container SIGTERMed mid-clone, clone restarting from empty
-    # every ~2.5min forever. Readiness correctly reports the clone-in-progress
-    # state and is NOT fatal, so only the liveness budget needs raising.
-    # 90 * 20 + 30 ~= 30min is comfortably longer than a slow clone while
-    # still bounding a genuine post-startup hang. The chart exposes no
-    # startupProbe for postgresql (confirmed live on the StatefulSet), so the
-    # liveness budget is the only lever to gate the clone window.
-    livenessProbe:
-      enabled: true
-      initialDelaySeconds: 30
-      periodSeconds: 20
-      timeoutSeconds: 20
-      successThreshold: 1
-      failureThreshold: 90
-    readinessProbe:
-      enabled: true
-      initialDelaySeconds: 10
-      periodSeconds: 20
-      timeoutSeconds: 20
-      successThreshold: 1
-      failureThreshold: 6
-  pgpool:
-    # Sustained CPU consumer under load (see the docker-push 401 saga
-    # above). Prefer the worker node (kub-node-1) over the control plane,
-    # whose host (ra) saturates/thermal-throttles under combined k3s +
-    # workload CPU pressure.
-    affinity:
-      nodeAffinity:
-        preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            preference:
-              matchExpressions:
-                - key: kubernetes.io/hostname
-                  operator: In
-                  values:
-                    - kub-node-1
-    # In static child mode (the default) num_init_children IS the client
-    # session cap (32 - 1 reserved = 31 usable). 32 is the maximum that fits
-    # postgres's 768Mi memory limit (each child holds backends on all 3
-    # nodes, ~10-15MB each). Gitea's MAX_OPEN_CONNS=25 (above) stays under
-    # this cap, which is what actually fixes the docker-push 401s.
-    numInitChildren: 32
-    # "small" preset resolves to a 768Mi memory limit in this chart version
-    # (confirmed live via the running pod's actual resources, not the
-    # comment above which was written for a different symptom) — still not
-    # enough: pgpool was hitting "container init was OOM-killed" on every
-    # single start, 470+ CrashLoopBackOff restarts over ~40h, before ever
-    # reaching a healthy state. Overriding explicitly well past the preset
-    # rather than trusting another preset tier to be enough.
+    # Explicit instead of the subchart's "nano" preset, which is too tight
+    # for Gitea's docker-push auth bursts (see MAX_OPEN_CONNS above).
     resources:
       requests:
         cpu: 250m
-        memory: 768Mi
+        memory: 512Mi
       limits:
-        cpu: 750m
-        memory: 1536Mi
+        cpu: 1000m
+        memory: 1Gi
+
+valkey:
+  enabled: true
+  architecture: standalone
+  primary:
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: kubernetes.io/hostname
+                  operator: In
+                  values:
+                    - kub-node-1
 
 gitea:
   # Prefer the worker node (kub-node-1) over the control plane, whose host
