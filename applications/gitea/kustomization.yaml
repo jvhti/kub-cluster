@@ -6,6 +6,7 @@ namespace: gitea
 resources:
   - namespace.yaml
   - httproute.yaml
+  - backup.yaml
 
 helmCharts:
   - name: gitea

@@ -1,0 +1,103 @@
+# Nightly `gitea dump` backup. Added 2026-09-30 after Gitea's database was
+# lost with no backup of any kind (only the bare repos survived on the NFS
+# share, and issues, users, tokens and settings were gone).
+#
+# What's in each dump: the database (as gitea-db.sql), repos, app.ini, and the
+# data dir (avatars, attachments, actions logs...). NOT package data
+# (--skip-package-data): container images take ~10GB and are rebuildable from
+# the repos by the Actions workflows, while everything else is a few MB.
+#
+# Dumps go to their own nfs-csi volume, NOT under gitea-shared-storage's
+# /data, which is itself part of every dump, so each night's dump would
+# otherwise contain all the previous ones. Both volumes live on TrueNAS
+# (General/longhorn), i.e. still the single-disk pool, so this protects
+# against database/cluster loss, not against losing that disk.
+#
+# Restore outline: extract the tarball, recreate an empty `gitea` DB and
+# `psql -f gitea-db.sql` into it, copy repos/ back to
+# /data/git/gitea-repositories and data/ into /data, then restart Gitea.
+# The image tag must match applications/gitea/values.yaml `image.tag`, since
+# a dump is only guaranteed to restore on the same Gitea version.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-backups
+  namespace: gitea
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: nfs-csi
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gitea-backup
+  namespace: gitea
+spec:
+  # 02:30 UTC, after Immich's 02:00 DB dump.
+  schedule: "30 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+          containers:
+            - name: dump
+              image: docker.gitea.com/gitea:1.27.3-rootless
+              env:
+                # Same paths the chart gives the Gitea Deployment, so
+                # `gitea dump` reads the live app.ini (DB credentials
+                # included) from the shared volume.
+                - name: GITEA_APP_INI
+                  value: /data/gitea/conf/app.ini
+                - name: GITEA_WORK_DIR
+                  value: /data
+                - name: GITEA_CUSTOM
+                  value: /data/gitea
+                - name: GITEA_TEMP
+                  value: /tmp/gitea
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  f=/backups/gitea-dump-$(date -u +%Y%m%dT%H%M%SZ).tar.gz
+                  gitea dump --type tar.gz --skip-package-data --skip-log \
+                    --tempdir /tmp --file "$f"
+                  ls -la "$f"
+                  # Keep 14 days.
+                  find /backups -name 'gitea-dump-*.tar.gz' -mtime +13 -print -delete
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 1000m
+                  memory: 1Gi
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+                - name: backups
+                  mountPath: /backups
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: gitea-shared-storage
+            - name: backups
+              persistentVolumeClaim:
+                claimName: gitea-backups
+            - name: tmp
+              emptyDir: {}
