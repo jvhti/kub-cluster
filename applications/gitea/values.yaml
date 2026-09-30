@@ -128,6 +128,19 @@ gitea:
                 operator: In
                 values:
                   - kub-node-1
+  # The chart default creates `gitea_admin` with a PUBLIC password
+  # (r8sA8CPHD9!bt6d, printed in the chart's own values.yaml) and
+  # passwordMode keepUpdated resets it to that on every pod start. Confirmed
+  # live on 2026-09-30: an internet-reachable admin login. Instead the chart
+  # manages the real admin account from an imperative Secret (not in git;
+  # keys: username, password), and initialOnlyRequireReset creates it once
+  # with a forced password change and never touches it again.
+  #   kubectl create secret generic gitea-admin-credentials -n gitea \
+  #     --from-literal=username=jvhti --from-literal=password='<random>'
+  admin:
+    existingSecret: gitea-admin-credentials
+    email: jvhti@hotmail.com
+    passwordMode: initialOnlyRequireReset
   service:
     ssh:
       # NodePort instead of the chart default (headless ClusterIP, 22 ->
