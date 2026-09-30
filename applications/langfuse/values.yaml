@@ -26,6 +26,14 @@ langfuse:
   # langfuse.worker.*, NOT the top-level web:/worker: blocks (those only hold
   # deploy toggles/resources) — an earlier commit put them in the wrong place
   # and ArgoCD synced a no-op.
+  #
+  # Stopped 2026-09-30 to free RAM on PVE host osiris (see the note under the
+  # top-level `web:` below). This is the key that actually scales web AND
+  # worker: the templates render `langfuse.web.replicas | default
+  # langfuse.replicas`, and Helm's `default` treats 0 as empty, so setting
+  # langfuse.web.replicas/worker.replicas to 0 would silently fall back to
+  # this value. Remove (chart default 1) to restore.
+  replicas: 0
   web:
     livenessProbe:
       initialDelaySeconds: 120
@@ -100,10 +108,12 @@ langfuse:
         issuer: https://auth.jvos.dev
         name: Authelia
 web:
-  # Stopped 2026-09-30 (with clickhouse) to free RAM on PVE host osiris, which
-  # is overcommitted since kub-ctrl-1 moved there — host swap was stalling etcd.
-  # History: stopped 2026-09-24 (836b1eb), restored 2026-09-26 (c0e6d2f).
-  # Set back to true once osiris has headroom.
+  # WARNING: chart v2.0.0 does NOT read this top-level block at all (web/worker
+  # settings live under langfuse.web/langfuse.worker), so `deploy` here is a
+  # no-op. The 2026-09-24 "stop" (836b1eb) used it and langfuse kept running
+  # the whole time. The real stop, added 2026-09-30 to free RAM on PVE host
+  # osiris (overcommitted since kub-ctrl-1 moved there; host swap was stalling
+  # etcd), is `langfuse.replicas: 0` above.
   deploy: false
   # Langfuse web is CPU-heavy. Prefer the worker node (kub-node-1, on osiris —
   # 24 vCPU / 24GB) over the control plane, whose host (ra) saturates during
@@ -112,7 +122,7 @@ web:
     kubernetes.io/hostname: kub-node-1
 
 worker:
-  # Stopped 2026-09-30 — see the note under `web:` above.
+  # No-op, like `web.deploy` above; see the warning there.
   deploy: false
   nodeSelector:
     kubernetes.io/hostname: kub-node-1
