@@ -100,12 +100,11 @@ langfuse:
         issuer: https://auth.jvos.dev
         name: Authelia
 web:
-  # Restored 2026-09-26. Was stopped 2026-09-24 as a CPU-starvation mitigation,
-  # but that incident's actual root cause was `kub-ctrl-1` being cordoned —
-  # Longhorn marks cordoned nodes Schedulable=False, so no replica could launch
-  # and every volume failed to attach. Fixing that (uncordon) plus moving this
-  # workload off the control plane makes the stop unnecessary.
-  deploy: true
+  # Stopped 2026-09-30 (with clickhouse) to free RAM on PVE host osiris, which
+  # is overcommitted since kub-ctrl-1 moved there — host swap was stalling etcd.
+  # History: stopped 2026-09-24 (836b1eb), restored 2026-09-26 (c0e6d2f).
+  # Set back to true once osiris has headroom.
+  deploy: false
   # Langfuse web is CPU-heavy. Prefer the worker node (kub-node-1, on osiris —
   # 24 vCPU / 24GB) over the control plane, whose host (ra) saturates during
   # k3s reconciliation. Soft preference so a rollout can still land elsewhere.
@@ -113,8 +112,8 @@ web:
     kubernetes.io/hostname: kub-node-1
 
 worker:
-  # Restored 2026-09-26 — see the note under `web:` above.
-  deploy: true
+  # Stopped 2026-09-30 — see the note under `web:` above.
+  deploy: false
   nodeSelector:
     kubernetes.io/hostname: kub-node-1
 

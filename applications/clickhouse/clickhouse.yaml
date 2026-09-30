@@ -10,12 +10,13 @@ metadata:
   name: clickhouse
   namespace: clickhouse
 spec:
-  # Restored 2026-09-26. Was replicas:0 from 2026-09-24 as a CPU-starvation
-  # mitigation. That stop was never the real fix — the root cause was
-  # `kub-ctrl-1` being cordoned, which broke Longhorn replica scheduling and
-  # cascaded into every volume failing to attach. With that fixed and the
-  # affinity below pinning ClickHouse to the worker node, 1 replica is safe.
-  replicas: 1
+  # Stopped 2026-09-30 to free RAM on PVE host osiris: kub-ctrl-1 (VM 134) was
+  # migrated there alongside kub-node-1 (VM 135), overcommitting its 31G and
+  # stalling etcd writes via host swap. ClickHouse is only used by Langfuse
+  # (also stopped). History: replicas:0 2026-09-24 (836b1eb), restored
+  # 2026-09-26 (c0e6d2f). Set back to 1 once osiris has headroom (e.g.
+  # kub-ctrl-1 moved back to ra).
+  replicas: 0
   strategy:
     type: Recreate
   selector:
